@@ -1,0 +1,49 @@
+# Development plan
+
+## Confirmed constraints
+
+- Solo participant in the Indie Developer track.
+- Preferred problem statement: Push the Frontier.
+- Preferred concept: autonomous engineering lab.
+- Python and PyTorch experience; MacBook Air for local development.
+- Approximately 5-6 working hours per day.
+- Meta Model API credits activated; Baseten and Modal access available.
+- Dedicated public repository, with meaningful commits from the beginning.
+- Participant-guide deadline: November 4, 2026, 9 PM EST / November 5, 2026, 7:30 AM IST.
+
+## Decisions still open
+
+1. Engineering application and intended user.
+2. Concrete objective, constraints, and simulator assumptions.
+3. Agent actions that require reasoning beyond conventional optimization.
+4. Final model/provider choice following a small tool-use test.
+5. Success metric, comparison methods, and held-out scenarios.
+
+## Proposed milestones
+
+These are planning targets, not completed work.
+
+| Date (IST) | Target |
+| --- | --- |
+| October 30-31 | Select one application; prove the simulator and baseline work; test real model tool calls. |
+| November 1 | Complete one end-to-end experiment loop with recorded decisions and outcomes. |
+| November 2 | Run comparative evaluation and held-out scenarios; assess whether the supervisor adds value. |
+| November 3 | Refine the interface and demonstration; address failure cases. |
+| November 4 | Freeze scope, record the three-minute video, verify public artifacts, and submit with buffer. |
+
+## Feasibility gate
+
+Before investing in presentation, demonstrate a trustworthy simulation, a functioning conventional baseline, and an agent capable of completing the experiment loop. Choose a smaller scope if simulation or integration takes too long. If adaptive supervision does not improve outcomes, investigate and report the evidence rather than claiming an advantage.
+
+## Repository practice
+
+- Make small commits after coherent changes: simulator, baseline, agent tools, evaluation, interface, and demo.
+- Record actual development history without backdating commits.
+- Stage specific files and inspect staged changes before pushing.
+- Keep credentials in local environment variables or provider secret stores.
+- Publish curated evaluation artifacts with configurations and seeds; inspect raw provider logs before publication.
+- Attribute reused work and distinguish it from new hackathon contributions.
+
+## Prize strategy
+
+Prioritize the main judging rubric: impact (30%), Meta tooling (25%), execution (20%), and demo (25%). Open-weight and agentic bonus awards are potential additional fits under the participant guide, not guaranteed eligibility or outcomes. Do not add features solely to chase additional categories.

@@ -1,0 +1,38 @@
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.aws/
+.secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# JavaScript / interface tooling
+node_modules/
+.next/
+
+# Local artifacts; publish curated results separately
+tmp/
+logs/
+checkpoints/
+wandb/
+*.pt
+*.pth
+*.safetensors
+
+# Editor / operating system
+.DS_Store
+.idea/
+.vscode/
