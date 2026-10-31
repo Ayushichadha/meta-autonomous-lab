@@ -2,7 +2,7 @@
 
 An autonomous engineering experiment lab being developed for the Meta Global AI Developer Hackathon 2026, Indie Developer track, under the **Push the Frontier** problem statement.
 
-**Status: first implementation, October 31, 2026.** The local simulator, constraint-checked scheduler, and conventional recovery experiments work. A bounded Meta-model tool loop is implemented; live provider verification is pending local credentials. These are synthetic development experiments, not real-factory validation or evidence of AI superiority. The repository retains its original name, `meta-autonomous-lab`.
+**Status: first implementation, October 31, 2026.** The local simulator, constraint-checked scheduler, conventional recovery experiments, and browser dashboard work. A bounded Meta-model tool loop is implemented; live provider verification is pending local credentials. These are synthetic development experiments, not real-factory validation or evidence of AI superiority. The repository retains its original name, `meta-autonomous-lab`.
 
 ## Run locally
 
@@ -13,12 +13,21 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
 factory-lab demo
+factory-lab serve
 python -m pytest
 ```
 
 The demo writes `runs/demo.json` and compares preserving queue/routing, rescheduling queued work, and allowing eligible reroutes. It uses no AI and spends no API credits. Outputs include forecasts under three published repair-time assumptions, actual constraint-check results, solver status, and per-order completion times. `runs/` is ignored by Git.
 
-On macOS with Python 3.13, if an editable installation succeeds but imports fail, check whether the editable `.pth` file has the Finder hidden flag. Clear that flag with `chflags nohidden .venv/lib/python3.13/site-packages/__editable__.factory_recovery_lab-0.1.0.pth`, adjusting the Python version if needed.
+Open `http://127.0.0.1:8765` after running `factory-lab serve`. The local dashboard runs real solver/simulation experiments, displays schedule timelines and per-order outcomes, and exports run JSON. The live Meta button requires a configured local key and uses credits. The dashboard binds only to loopback; it is a development server, not a public deployment.
+
+On macOS with Python 3.13, Finder-hidden editable `.pth` files may be skipped by Python. If an editable install succeeds but imports fail, use the source directly:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m factory_lab.cli serve
+```
+
+The test configuration includes the source directory explicitly. A normal non-editable `python -m pip install .` is another option, but source changes then require reinstalling.
 
 ## Connect the Meta model
 

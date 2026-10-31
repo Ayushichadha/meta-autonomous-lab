@@ -40,8 +40,9 @@ def prepare(scenario: Scenario, *, outage_at: int = 25, repair_at: int = 115,
 
 
 def run_comparison(scenario: Scenario, *, time_limit: float = 3.0,
-                   repair_at: int = 115) -> dict:
-    original, state, incident = prepare(scenario, repair_at=repair_at, time_limit=time_limit)
+                   repair_at: int = 115, outage_at: int = 25, machine: str = "CNC-A") -> dict:
+    original, state, incident = prepare(scenario, repair_at=repair_at, outage_at=outage_at,
+                                       machine=machine, time_limit=time_limit)
     healthy = simulate(scenario, Snapshot(), original)
     candidates = [experiment(scenario, state, original, incident, policy, time_limit)
                   for policy in ("preserve", "reschedule", "reroute")]

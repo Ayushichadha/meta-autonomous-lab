@@ -27,6 +27,7 @@ node_modules/
 tmp/
 logs/
 runs/
+output/
 checkpoints/
 wandb/
 *.pt

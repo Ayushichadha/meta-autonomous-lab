@@ -6,7 +6,8 @@ Factory recovery was selected on October 31, 2026. The [MVP specification](FACTO
 
 - Implemented: scenario models, SimPy execution, CP-SAT scheduling, independent schedule validation, pause/resume semantics, three conventional recovery candidates, and repair-uncertainty trials.
 - Implemented but not live-verified: bounded model tool loop and Baseten/Meta API clients. Credentials are not yet configured locally.
-- Remaining: sequential updates, event extraction, policy-level benchmark, Modal batches, demo-quality interface, and submission assets.
+- Implemented: local browser dashboard with incident controls, candidate comparisons, machine state, schedule timelines, per-order delivery forecasts, and run export. Browser-checked on the narrow preview with default and alternate outages.
+- Remaining: sequential updates, event extraction, policy-level benchmark, Modal batches, interface refinement, deployment, and submission assets.
 
 ## Confirmed constraints
 

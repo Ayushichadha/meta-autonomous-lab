@@ -25,7 +25,7 @@ factory-lab = "factory_lab.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-factory_lab = ["scenarios/*.json"]
+factory_lab = ["scenarios/*.json", "web/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

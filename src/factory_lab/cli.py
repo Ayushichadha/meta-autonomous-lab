@@ -26,6 +26,8 @@ def print_comparison(report: dict) -> None:
 def main():
     parser = argparse.ArgumentParser(description="Factory Recovery Lab")
     commands = parser.add_subparsers(dest="command", required=True)
+    serve = commands.add_parser("serve", help="Launch the local browser dashboard")
+    serve.add_argument("--port", type=int, default=8765)
     demo = commands.add_parser("demo", help="Run the offline simulator and three conventional recovery candidates")
     demo.add_argument("--output", type=Path, default=Path("runs/demo.json"))
     demo.add_argument("--solve-seconds", type=float, default=3.0)
@@ -42,7 +44,12 @@ def main():
     batch.add_argument("--output", type=Path, default=Path("runs/development_batch.json"))
     args = parser.parse_args()
     try:
-        if args.command == "demo":
+        if args.command == "serve":
+            from .server import run_dashboard
+            if not 1024 <= args.port <= 65535:
+                raise ValueError("Port must be between 1024 and 65535")
+            run_dashboard(args.port)
+        elif args.command == "demo":
             report = run_comparison(load_demo(), time_limit=args.solve_seconds, repair_at=args.repair_at)
             write_json(args.output, report)
             print_comparison(report)
