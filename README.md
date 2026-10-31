@@ -1,16 +1,16 @@
-# Meta Autonomous Lab
+# Factory Recovery Lab
 
 An autonomous engineering experiment lab being developed for the Meta Global AI Developer Hackathon 2026, Indie Developer track, under the **Push the Frontier** problem statement.
 
-**Status: planning.** The name is provisional. No working implementation or performance claims are available yet. The engineering application has not been selected.
+**Status: planning; factory recovery selected October 31, 2026.** No working implementation or performance claims are available yet. The repository retains its original name, `meta-autonomous-lab`.
 
 ## Proposed direction
 
-Given an engineering objective, constraints, and an experiment budget, a Meta-model-powered agent would plan experiments, call simulation and optimization tools, inspect measured outcomes, and decide whether to persist with its current strategy or revise it.
+When a machine fails or a repair estimate changes, a Meta-model-powered agent interprets the operational update, tests recovery plans in a simulated factory, and decides whether to preserve production commitments or revise them. A constraint solver constructs feasible schedules; simulation measures their outcomes.
 
 The intended contribution is evidence-based experimental supervision: measure whether the agent's decisions improve outcomes beyond conventional search and strong fixed revision schedules.
 
-Candidate applications include simulated motor control and thermal control. Selection depends on a short feasibility test and the developer's domain preference.
+The initial user is a production planner at a small component manufacturer. The MVP covers one synthetic shop, machine outages, repair-time updates, and bounded recovery actions. Satellite-component manufacturing is a possible later scenario using the same engine after the core demo and evaluation are complete. See the [factory MVP specification](docs/FACTORY_MVP.md).
 
 ## Research foundations
 
@@ -21,7 +21,7 @@ These are prior research, not hackathon contributions. Their results concern hie
 
 ## Proposed infrastructure
 
-- Python for simulations, experiment tools, and evaluation.
+- Python and SimPy for discrete-event simulation; OR-Tools CP-SAT for scheduling; a separate constraint checker for plan validation.
 - Muse Spark Open through Baseten as a candidate experiment manager. The participant guide specifies `meta-models/muse-spark-open-1026`; availability and tool behavior must be verified before implementation.
 - Modal for experiment batches or remote compute when needed.
 - Meta Model API for comparison with hosted Muse models.

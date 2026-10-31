@@ -1,10 +1,12 @@
-# Development plan
+# Factory recovery development plan
+
+Factory recovery was selected on October 31, 2026. The [MVP specification](FACTORY_MVP.md) defines the product, evaluation, and scope boundaries. No implementation is complete yet.
 
 ## Confirmed constraints
 
 - Solo participant in the Indie Developer track.
 - Preferred problem statement: Push the Frontier.
-- Preferred concept: autonomous engineering lab.
+- Selected concept: autonomous factory recovery lab.
 - Python and PyTorch experience; MacBook Air for local development.
 - Approximately 5-6 working hours per day.
 - Meta Model API credits activated; Baseten and Modal access available.
@@ -13,11 +15,9 @@
 
 ## Decisions still open
 
-1. Engineering application and intended user.
-2. Concrete objective, constraints, and simulator assumptions.
-3. Agent actions that require reasoning beyond conventional optimization.
-4. Final model/provider choice following a small tool-use test.
-5. Success metric, comparison methods, and held-out scenarios.
+1. Final model/provider choice following a small tool-use test.
+2. UI framework after the simulator proof.
+3. Scenario parameters and objective weights, to be frozen before held-out evaluation.
 
 ## Proposed milestones
 
@@ -25,9 +25,9 @@ These are planning targets, not completed work.
 
 | Date (IST) | Target |
 | --- | --- |
-| October 30-31 | Select one application; prove the simulator and baseline work; test real model tool calls. |
-| November 1 | Complete one end-to-end experiment loop with recorded decisions and outcomes. |
-| November 2 | Run comparative evaluation and held-out scenarios; assess whether the supervisor adds value. |
+| October 31 | Prove the factory simulator, independent validator, and baseline work; test a real model tool call. |
+| November 1 | Complete the recovery loop with structured events, experiments, and recorded decisions. |
+| November 2 | Run comparative evaluation and held-out scenarios; build the functional dashboard. |
 | November 3 | Refine the interface and demonstration; address failure cases. |
 | November 4 | Freeze scope, record the three-minute video, verify public artifacts, and submit with buffer. |
 
