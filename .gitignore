@@ -26,6 +26,7 @@ node_modules/
 # Local artifacts; publish curated results separately
 tmp/
 logs/
+runs/
 checkpoints/
 wandb/
 *.pt

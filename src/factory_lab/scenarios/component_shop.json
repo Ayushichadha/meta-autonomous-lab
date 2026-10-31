@@ -1,0 +1,253 @@
+{
+  "name": "Component Works / synthetic development scenario",
+  "description": "Eight synthetic component orders. Alternate machining routes include 12 minutes of setup/processing overhead. No real factory data.",
+  "synthetic": true,
+  "machines": [
+    "CNC-A",
+    "CNC-B",
+    "INSPECT",
+    "ASSEMBLY"
+  ],
+  "orders": [
+    {
+      "id": "ORD-01",
+      "release": 0,
+      "due": 100,
+      "priority": 3,
+      "operations": [
+        {
+          "id": "ORD-01/machine",
+          "durations": {
+            "CNC-A": 42,
+            "CNC-B": 54
+          },
+          "preferred_machine": "CNC-A"
+        },
+        {
+          "id": "ORD-01/inspect",
+          "durations": {
+            "INSPECT": 10
+          },
+          "preferred_machine": "INSPECT"
+        },
+        {
+          "id": "ORD-01/assemble",
+          "durations": {
+            "ASSEMBLY": 20
+          },
+          "preferred_machine": "ASSEMBLY"
+        }
+      ]
+    },
+    {
+      "id": "ORD-02",
+      "release": 0,
+      "due": 120,
+      "priority": 2,
+      "operations": [
+        {
+          "id": "ORD-02/machine",
+          "durations": {
+            "CNC-B": 35,
+            "CNC-A": 47
+          },
+          "preferred_machine": "CNC-B"
+        },
+        {
+          "id": "ORD-02/inspect",
+          "durations": {
+            "INSPECT": 12
+          },
+          "preferred_machine": "INSPECT"
+        },
+        {
+          "id": "ORD-02/assemble",
+          "durations": {
+            "ASSEMBLY": 18
+          },
+          "preferred_machine": "ASSEMBLY"
+        }
+      ]
+    },
+    {
+      "id": "ORD-03",
+      "release": 0,
+      "due": 145,
+      "priority": 3,
+      "operations": [
+        {
+          "id": "ORD-03/machine",
+          "durations": {
+            "CNC-A": 50,
+            "CNC-B": 62
+          },
+          "preferred_machine": "CNC-A"
+        },
+        {
+          "id": "ORD-03/inspect",
+          "durations": {
+            "INSPECT": 8
+          },
+          "preferred_machine": "INSPECT"
+        },
+        {
+          "id": "ORD-03/assemble",
+          "durations": {
+            "ASSEMBLY": 22
+          },
+          "preferred_machine": "ASSEMBLY"
+        }
+      ]
+    },
+    {
+      "id": "ORD-04",
+      "release": 0,
+      "due": 155,
+      "priority": 1,
+      "operations": [
+        {
+          "id": "ORD-04/machine",
+          "durations": {
+            "CNC-B": 30,
+            "CNC-A": 42
+          },
+          "preferred_machine": "CNC-B"
+        },
+        {
+          "id": "ORD-04/inspect",
+          "durations": {
+            "INSPECT": 15
+          },
+          "preferred_machine": "INSPECT"
+        },
+        {
+          "id": "ORD-04/assemble",
+          "durations": {
+            "ASSEMBLY": 15
+          },
+          "preferred_machine": "ASSEMBLY"
+        }
+      ]
+    },
+    {
+      "id": "ORD-05",
+      "release": 0,
+      "due": 180,
+      "priority": 2,
+      "operations": [
+        {
+          "id": "ORD-05/machine",
+          "durations": {
+            "CNC-A": 45,
+            "CNC-B": 57
+          },
+          "preferred_machine": "CNC-A"
+        },
+        {
+          "id": "ORD-05/inspect",
+          "durations": {
+            "INSPECT": 10
+          },
+          "preferred_machine": "INSPECT"
+        },
+        {
+          "id": "ORD-05/assemble",
+          "durations": {
+            "ASSEMBLY": 20
+          },
+          "preferred_machine": "ASSEMBLY"
+        }
+      ]
+    },
+    {
+      "id": "ORD-06",
+      "release": 0,
+      "due": 195,
+      "priority": 1,
+      "operations": [
+        {
+          "id": "ORD-06/machine",
+          "durations": {
+            "CNC-B": 28,
+            "CNC-A": 40
+          },
+          "preferred_machine": "CNC-B"
+        },
+        {
+          "id": "ORD-06/inspect",
+          "durations": {
+            "INSPECT": 12
+          },
+          "preferred_machine": "INSPECT"
+        },
+        {
+          "id": "ORD-06/assemble",
+          "durations": {
+            "ASSEMBLY": 16
+          },
+          "preferred_machine": "ASSEMBLY"
+        }
+      ]
+    },
+    {
+      "id": "ORD-07",
+      "release": 0,
+      "due": 215,
+      "priority": 2,
+      "operations": [
+        {
+          "id": "ORD-07/machine",
+          "durations": {
+            "CNC-A": 38,
+            "CNC-B": 50
+          },
+          "preferred_machine": "CNC-A"
+        },
+        {
+          "id": "ORD-07/inspect",
+          "durations": {
+            "INSPECT": 9
+          },
+          "preferred_machine": "INSPECT"
+        },
+        {
+          "id": "ORD-07/assemble",
+          "durations": {
+            "ASSEMBLY": 18
+          },
+          "preferred_machine": "ASSEMBLY"
+        }
+      ]
+    },
+    {
+      "id": "ORD-08",
+      "release": 0,
+      "due": 235,
+      "priority": 1,
+      "operations": [
+        {
+          "id": "ORD-08/machine",
+          "durations": {
+            "CNC-B": 32,
+            "CNC-A": 44
+          },
+          "preferred_machine": "CNC-B"
+        },
+        {
+          "id": "ORD-08/inspect",
+          "durations": {
+            "INSPECT": 10
+          },
+          "preferred_machine": "INSPECT"
+        },
+        {
+          "id": "ORD-08/assemble",
+          "durations": {
+            "ASSEMBLY": 20
+          },
+          "preferred_machine": "ASSEMBLY"
+        }
+      ]
+    }
+  ]
+}

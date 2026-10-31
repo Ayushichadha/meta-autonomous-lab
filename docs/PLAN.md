@@ -1,6 +1,12 @@
 # Factory recovery development plan
 
-Factory recovery was selected on October 31, 2026. The [MVP specification](FACTORY_MVP.md) defines the product, evaluation, and scope boundaries. No implementation is complete yet.
+Factory recovery was selected on October 31, 2026. The [MVP specification](FACTORY_MVP.md) defines the product, evaluation, and scope boundaries.
+
+## Implementation progress
+
+- Implemented: scenario models, SimPy execution, CP-SAT scheduling, independent schedule validation, pause/resume semantics, three conventional recovery candidates, and repair-uncertainty trials.
+- Implemented but not live-verified: bounded model tool loop and Baseten/Meta API clients. Credentials are not yet configured locally.
+- Remaining: sequential updates, event extraction, policy-level benchmark, Modal batches, demo-quality interface, and submission assets.
 
 ## Confirmed constraints
 

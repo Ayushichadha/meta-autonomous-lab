@@ -2,7 +2,44 @@
 
 An autonomous engineering experiment lab being developed for the Meta Global AI Developer Hackathon 2026, Indie Developer track, under the **Push the Frontier** problem statement.
 
-**Status: planning; factory recovery selected October 31, 2026.** No working implementation or performance claims are available yet. The repository retains its original name, `meta-autonomous-lab`.
+**Status: first implementation, October 31, 2026.** The local simulator, constraint-checked scheduler, and conventional recovery experiments work. A bounded Meta-model tool loop is implemented; live provider verification is pending local credentials. These are synthetic development experiments, not real-factory validation or evidence of AI superiority. The repository retains its original name, `meta-autonomous-lab`.
+
+## Run locally
+
+Requires Python 3.11 or later.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+factory-lab demo
+python -m pytest
+```
+
+The demo writes `runs/demo.json` and compares preserving queue/routing, rescheduling queued work, and allowing eligible reroutes. It uses no AI and spends no API credits. Outputs include forecasts under three published repair-time assumptions, actual constraint-check results, solver status, and per-order completion times. `runs/` is ignored by Git.
+
+On macOS with Python 3.13, if an editable installation succeeds but imports fail, check whether the editable `.pth` file has the Finder hidden flag. Clear that flag with `chflags nohidden .venv/lib/python3.13/site-packages/__editable__.factory_recovery_lab-0.1.0.pth`, adjusting the Python version if needed.
+
+## Connect the Meta model
+
+Copy `.env.example` to `.env` and add your key locally. `.env` is ignored by Git. The following commands use provider credits:
+
+```bash
+factory-lab smoke --provider baseten
+factory-lab agent --provider baseten
+```
+
+`smoke` verifies the configured model is in the provider catalog and returns a real function call. `agent` lets the model choose bounded experiments and select a validated plan, saving `runs/agent.json`. Missing credentials or failed model requests produce an error; they never silently switch to a simulated model. Use `--provider meta` for Meta Model API with `META_API_KEY` or `MODEL_API_KEY`.
+
+Model dollar cost is left unset until provider pricing is verified; token usage and request duration are recorded.
+
+## Implementation boundaries
+
+- The current demonstration covers one outage decision. Sequential repair updates, fixed-interval policy comparisons, natural-language event extraction, and held-out agent evaluation remain to be built.
+- Started work retains its machine. Interrupted work pauses and resumes after repair; queued eligible work can be rerouted with the scenario's explicit duration overhead.
+- The scheduling objective is `100 * priority-weighted tardiness + queued start-time shifts + 30 * rerouted operations + makespan`. Displayed metrics remain separate.
+- Uncertainty trials replay a plan at the early, nominal, and late published repair estimates. They are not a probability model or a robustness guarantee.
+- `factory-lab development-batch --count 5` runs seeded development cases, explicitly labelled as development data.
 
 ## Proposed direction
 

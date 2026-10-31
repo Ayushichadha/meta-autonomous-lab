@@ -1,0 +1,29 @@
+# Resolved local development environment, Python 3.13 / macOS arm64.
+# For platform-specific wheels, install with pip from these exact versions.
+Pygments==2.21.0
+absl-py==2.5.1
+annotated-types==0.8.0
+anyio==4.15.1
+certifi==2026.10.23
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.20
+immutabledict==4.3.1
+iniconfig==2.3.1
+numpy==2.5.4
+ortools==9.15.6755
+packaging==26.3
+pandas==3.1.0
+pluggy==1.7.0
+protobuf==6.33.6
+pydantic==2.14.2
+pydantic_core==2.50.2
+pytest==9.2.0
+python-dateutil==3.0.0
+python-dotenv==1.2.4
+simpy==4.1.2
+six==1.17.0
+typing-inspection==0.4.4
+typing_extensions==4.16.0
+tzdata==2026.6
