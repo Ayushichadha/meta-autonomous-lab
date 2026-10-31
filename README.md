@@ -34,11 +34,11 @@ The test configuration includes the source directory explicitly. A normal non-ed
 Copy `.env.example` to `.env` and add your key locally. `.env` is ignored by Git. The following commands use provider credits:
 
 ```bash
-factory-lab smoke --provider baseten
-factory-lab agent --provider baseten
+factory-lab smoke --provider meta
+factory-lab agent --provider meta
 ```
 
-`smoke` verifies the configured model is in the provider catalog and returns a real function call. `agent` lets the model choose bounded experiments and select a validated plan, saving `runs/agent.json`. Missing credentials or failed model requests produce an error; they never silently switch to a simulated model. Use `--provider meta` for Meta Model API with `META_API_KEY` or `MODEL_API_KEY`.
+`smoke` verifies the configured model is in the provider catalog and returns a real function call. `agent` lets the model choose bounded experiments and select a validated plan, saving `runs/agent.json`. Missing credentials or failed model requests produce an error; they never silently switch to a simulated model. Meta Model API is the default and uses `META_API_KEY` or `MODEL_API_KEY`. It draws from the activated $150 Meta credits. Partner credit applications are pending; use `--provider baseten` only when its account is ready.
 
 Model dollar cost is left unset until provider pricing is verified; token usage and request duration are recorded.
 
@@ -68,7 +68,8 @@ These are prior research, not hackathon contributions. Their results concern hie
 ## Proposed infrastructure
 
 - Python and SimPy for discrete-event simulation; OR-Tools CP-SAT for scheduling; a separate constraint checker for plan validation.
-- Muse Spark Open through Baseten as a candidate experiment manager. The participant guide specifies `meta-models/muse-spark-open-1026`; availability and tool behavior must be verified before implementation.
+- Muse Spark 1.3 through Meta Model API is the initial primary experiment manager, using activated Meta credits.
+- Muse Spark Open through Baseten is a later comparison candidate after partner credit approval. The participant guide specifies `meta-models/muse-spark-open-1026`; access and tool behavior still need verification.
 - Modal for experiment batches or remote compute when needed.
 - Meta Model API for comparison with hosted Muse models.
 

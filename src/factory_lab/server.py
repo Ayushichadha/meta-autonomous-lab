@@ -21,7 +21,7 @@ class RunRequest(Model):
     outage_at: int = Field(default=25, ge=1, le=200)
     repair_at: int = Field(default=115, ge=2, le=400)
     machine: str = "CNC-A"
-    provider: str = "baseten"
+    provider: str = "meta"
 
 
 def provider_status() -> dict:

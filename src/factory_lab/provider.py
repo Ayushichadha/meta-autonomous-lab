@@ -13,7 +13,7 @@ class ProviderError(RuntimeError):
 
 
 class ModelClient:
-    def __init__(self, provider: str = "baseten", *, env_file: str = ".env"):
+    def __init__(self, provider: str = "meta", *, env_file: str = ".env"):
         load_dotenv(Path(env_file), override=False)
         self.provider = provider
         if provider == "baseten":

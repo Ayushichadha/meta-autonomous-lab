@@ -68,4 +68,4 @@ def test_agent_stops_at_request_budget_without_selecting():
 def test_provider_reports_missing_key_without_network(monkeypatch, tmp_path):
     monkeypatch.delenv("BASETEN_API_KEY", raising=False)
     with pytest.raises(ProviderError, match="No baseten API key"):
-        ModelClient(env_file=str(tmp_path / "absent.env"))
+        ModelClient("baseten", env_file=str(tmp_path / "absent.env"))

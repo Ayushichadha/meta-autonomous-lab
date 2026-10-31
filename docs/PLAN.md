@@ -16,13 +16,14 @@ Factory recovery was selected on October 31, 2026. The [MVP specification](FACTO
 - Selected concept: autonomous factory recovery lab.
 - Python and PyTorch experience; MacBook Air for local development.
 - Approximately 5-6 working hours per day.
-- Meta Model API credits activated; Baseten and Modal access available.
+- $150 Meta Model API credits activated; use Meta API as the primary inference provider now.
+- Partner credit applications submitted; approval is pending. Baseten/Modal remain optional later resources.
 - Dedicated public repository, with meaningful commits from the beginning.
 - Participant-guide deadline: November 4, 2026, 9 PM EST / November 5, 2026, 7:30 AM IST.
 
 ## Decisions still open
 
-1. Final model/provider choice following a small tool-use test.
+1. Verify Muse Spark 1.3 on Meta Model API with a small real tool-use test; compare models after that works.
 2. UI framework after the simulator proof.
 3. Scenario parameters and objective weights, to be frozen before held-out evaluation.
 

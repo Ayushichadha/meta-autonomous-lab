@@ -37,8 +37,9 @@ The model supplies structured decisions and concise evidence summaries. Simulato
 - Shared Python domain models for simulator, solver, agent, and validator.
 - SimPy for event-based factory execution.
 - OR-Tools CP-SAT for scheduling; record time limits and solution status. Do not claim optimality for an unproven feasible solution.
-- Muse Spark Open via Baseten as first candidate; verify the guide's `meta-models/muse-spark-open-1026` endpoint and tool support.
-- Meta Model API candidates for comparison using existing credits. Choose after a small structured-output/tool-use test.
+- Primary: Muse Spark 1.3 on Meta Model API, using the activated $150 credits.
+- Later candidate after partner credit approval: Muse Spark Open via Baseten; verify the guide's `meta-models/muse-spark-open-1026` endpoint and tool support.
+- First verify a real structured-output/tool-use call, then compare hosted Meta models on our task.
 - Modal for independent scenario batches when useful, retaining local execution.
 - One browser dashboard: factory state, schedule timeline, event feed, candidate comparison, and outcomes. Choose UI framework after the simulator proof.
 - Credentials stay server-side and out of Git. Partner balances and endpoint behavior still need verification.
