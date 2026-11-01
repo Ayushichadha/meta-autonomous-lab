@@ -35,6 +35,11 @@ def simulate(scenario: Scenario, snapshot: Snapshot, plan: Plan, *, until: int |
     working_since: dict[str, int] = {}
     events: list[dict] = []
     entries = plan.by_operation
+    machine_previous = {}
+    for machine in scenario.machines:
+        queue = sorted((a for a in plan.assignments if a.machine == machine), key=lambda a: (a.start, a.operation))
+        for previous, following in zip(queue, queue[1:]):
+            machine_previous[following.operation] = previous.operation
     predecessor = {}
     release = {}
     for order in scenario.orders:
@@ -53,6 +58,8 @@ def simulate(scenario: Scenario, snapshot: Snapshot, plan: Plan, *, until: int |
             previous = predecessor[op_id]
             if previous:
                 yield done[previous]
+            if op_id in machine_previous:
+                yield done[machine_previous[op_id]]
             earliest = max(env.now, entry.start, release[op_id])
             yield env.timeout(earliest - env.now)
         # Active work always retains the machine, including while paused.

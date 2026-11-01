@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "frozen_on": "2026-11-01",
+  "generator": "factory_lab.evaluation.generate_case_v1",
+  "seeds": [10000,10001,10002,10003,10004,10005,10006,10007,10008,10009,10010,10011,10012,10013,10014,10015,10016,10017,10018,10019],
+  "baseline_policies": ["preserve", "always_replan", "fixed_interval", "solver_selection"],
+  "planned_meta_subset": [10000,10001,10002],
+  "meta_coverage_note": "Three preselected cases subject to the existing $1 local estimated-dollar guard. Unattempted cases remain explicitly unmeasured.",
+  "episode_config": {"interval_minutes":30,"solve_seconds":0.5,"max_agent_requests":12,"expired_estimate_extension":30},
+  "objective_weights": {"priority_weighted_tardiness":100,"queued_start_shift":1,"rerouted_operation":30,"makespan":1}
+}

@@ -28,6 +28,15 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     serve = commands.add_parser("serve", help="Launch the local browser dashboard")
     serve.add_argument("--port", type=int, default=8765)
+    episode = commands.add_parser("episode", help="Execute a sequential outage/update/repair scenario")
+    episode.add_argument("--policy", choices=["preserve", "always_replan", "fixed_interval", "solver_selection", "meta"], default="solver_selection")
+    episode.add_argument("--provider", choices=["meta", "baseten"], default="meta")
+    episode.add_argument("--solve-seconds", type=float, default=.5)
+    episode.add_argument("--output", type=Path, default=Path("runs/episode.json"))
+    evaluation = commands.add_parser("evaluate", help="Execute the frozen sequential comparison suite")
+    evaluation.add_argument("--config", type=Path, default=Path("configs/evaluation-v1.json"))
+    evaluation.add_argument("--output", type=Path, default=Path("runs/evaluation-v1"))
+    evaluation.add_argument("--include-meta", action="store_true", help="Uses credits on the preselected subset only")
     demo = commands.add_parser("demo", help="Run the offline simulator and three conventional recovery candidates")
     demo.add_argument("--output", type=Path, default=Path("runs/demo.json"))
     demo.add_argument("--solve-seconds", type=float, default=3.0)
@@ -49,6 +58,18 @@ def main():
             if not 1024 <= args.port <= 65535:
                 raise ValueError("Port must be between 1024 and 65535")
             run_dashboard(args.port)
+        elif args.command == "evaluate":
+            from .evaluation import evaluate
+            report = evaluate(args.config, args.output, include_meta=args.include_meta)
+            print(f"Saved {len(report['rows'])} policy/scenario outcomes to {args.output}")
+        elif args.command == "episode":
+            from .episode import EpisodeConfig, demo_events, live_supervisor, run_episode
+            config = EpisodeConfig(solve_seconds=args.solve_seconds)
+            callback = live_supervisor(args.provider, solve_seconds=args.solve_seconds) if args.policy == "meta" else None
+            report = run_episode(load_demo(), demo_events(), policy=args.policy, config=config, supervisor=callback)
+            write_json(args.output, report)
+            print(json.dumps({"status": report["status"], "policy": args.policy,
+                "realized_metrics": report["realized_metrics"], "failures": report["failures"]}, indent=2))
         elif args.command == "demo":
             report = run_comparison(load_demo(), time_limit=args.solve_seconds, repair_at=args.repair_at)
             write_json(args.output, report)

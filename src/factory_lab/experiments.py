@@ -7,22 +7,24 @@ from .simulator import simulate
 from .validation import validate_plan
 
 
-def experiment(scenario: Scenario, state: Snapshot, reference: Plan, incident: Incident,
+def experiment(scenario: Scenario, state: Snapshot, reference: Plan, incident: Incident | None,
                policy: Policy, time_limit: float = 3.0) -> dict:
-    if incident.observed_at != state.now:
+    if incident is not None and incident.observed_at != state.now:
         raise ValueError("Incident and decision state times differ")
-    if state.available_at.get(incident.machine) != incident.estimated_repair_at:
+    if incident is not None and state.available_at.get(incident.machine) != incident.estimated_repair_at:
         raise ValueError("Apply the current incident before experimenting")
     plan = solve(scenario, state, reference=reference, policy=policy, time_limit=time_limit)
     finishes = sorted({max(state.now + 1, incident.estimated_repair_at - incident.uncertainty_minutes),
                        incident.estimated_repair_at,
-                       incident.estimated_repair_at + incident.uncertainty_minutes})
+                       incident.estimated_repair_at + incident.uncertainty_minutes}) if incident else [None]
     trials = []
     for repair_at in finishes:
-        run = simulate(scenario, state, plan, repair_overrides={incident.machine: repair_at})
+        assumptions = {incident.machine: repair_at} if incident else {}
+        run = simulate(scenario, state, plan, repair_overrides=assumptions)
         trials.append({"assumed_repair_at": repair_at,
+                       "repair_assumptions": {**state.available_at, **assumptions},
                        "metrics": measure(scenario, run.snapshot, plan=plan, reference=reference, decision_state=state)})
-    nominal = next(t["metrics"] for t in trials if t["assumed_repair_at"] == incident.estimated_repair_at)
+    nominal = next(t["metrics"] for t in trials if t["assumed_repair_at"] == (incident.estimated_repair_at if incident else None))
     return {"policy": policy, "plan": plan.model_dump(), "nominal_metrics": nominal,
             "worst_tested_weighted_tardiness": max(t["metrics"]["weighted_tardiness_minutes"] for t in trials),
             "uncertainty_trials": trials, "constraint_errors": validate_plan(scenario, state, plan),

@@ -132,13 +132,23 @@ def check_snapshot(scenario: Scenario, snapshot: Snapshot) -> None:
         duration = ops[op_id].durations[record.machine]
         if record.started_at > snapshot.now or record.worked > duration:
             raise ValueError("Invalid progress timing")
+        if record.worked > snapshot.now - record.started_at:
+            raise ValueError("Worked time exceeds elapsed time")
         if record.completed_at is not None:
             if not record.started_at < record.completed_at <= snapshot.now or record.worked != duration:
                 raise ValueError("Invalid completion record")
+            if record.completed_at - record.started_at < record.worked:
+                raise ValueError("Completed work exceeds elapsed time")
         else:
             if record.worked >= duration or record.machine in active_machines:
                 raise ValueError("Invalid active operation or duplicate machine occupancy")
             active_machines.add(record.machine)
+    for machine in scenario.machines:
+        occupied = sorted((r.started_at, r.completed_at if r.completed_at is not None else snapshot.now, op_id)
+                          for op_id, r in snapshot.progress.items() if r.machine == machine)
+        for left, right in zip(occupied, occupied[1:]):
+            if left[1] > right[0]:
+                raise ValueError("Historical machine occupancy overlaps")
     for order in scenario.orders:
         for i, op in enumerate(order.operations):
             record = snapshot.progress.get(op.id)
