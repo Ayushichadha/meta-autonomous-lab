@@ -5,7 +5,8 @@ from importlib.resources import files
 import json
 import os
 from pathlib import Path
-from threading import Lock
+from threading import Lock, Thread
+from typing import Literal
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -24,6 +25,28 @@ class RunRequest(Model):
     provider: str = "meta"
 
 
+class EpisodeRequest(Model):
+    policy: Literal["preserve", "always_replan", "fixed_interval", "solver_selection", "meta"] = "solver_selection"
+    provider: Literal["meta", "baseten"] = "meta"
+
+
+def local_budget_status() -> dict:
+    from .budget import BudgetLedger
+    ledger = BudgetLedger()
+    with ledger.locked() as (_, records):
+        latest = {r["request_id"]: r for r in records}
+    return {"limit_usd": 1.0, "reserved_or_estimated_usd": sum(r["charged_usd"] for r in latest.values()),
+            "note": "Local estimate/reservations, not the provider account balance."}
+
+
+def read_recorded(paths: list[str]) -> dict:
+    for name in paths:
+        path = Path(name)
+        if path.is_file():
+            return json.loads(path.read_text())
+    raise FileNotFoundError("No recorded artifact is available yet")
+
+
 def provider_status() -> dict:
     local = dotenv_values(".env")
     def value(key):
@@ -38,9 +61,40 @@ def provider_status() -> dict:
 
 def run_dashboard(port: int = 8765) -> None:
     busy = Lock()
+    jobs_lock = Lock()
+    jobs = {}
     allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
-    assets = {"/": ("index.html", "text/html"), "/app.css": ("app.css", "text/css"),
-              "/app.js": ("app.js", "text/javascript")}
+    assets = {"/": ("console.html", "text/html"), "/single": ("index.html", "text/html"),
+              "/app.css": ("app.css", "text/css"), "/app.js": ("app.js", "text/javascript"),
+              "/console.css": ("console.css", "text/css"), "/console.js": ("console.js", "text/javascript")}
+
+    def episode_worker(job_id, request):
+        from .episode import EpisodeConfig, demo_events, live_supervisor, run_episode
+        def progress(item):
+            with jobs_lock:
+                jobs[job_id]["progress"].append(item)
+                jobs[job_id]["progress"] = jobs[job_id]["progress"][-100:]
+        def frame_ready(frame):
+            with jobs_lock:
+                jobs[job_id]["frames"].append(frame)
+            progress({"stage": "observation_recorded", "time": frame["time"]})
+        try:
+            config = EpisodeConfig()
+            callback = live_supervisor(request.provider, solve_seconds=config.solve_seconds,
+                on_progress=progress) if request.policy == "meta" else None
+            result = run_episode(load_demo(), demo_events(), policy=request.policy, config=config,
+                supervisor=callback, on_frame=frame_ready)
+            result["run_id"] = job_id
+            path = Path("runs") / (job_id + "-episode.json")
+            path.parent.mkdir(exist_ok=True)
+            path.write_text(json.dumps(result, indent=2) + "\n")
+            with jobs_lock:
+                jobs[job_id].update(status="completed", result=result)
+        except Exception as error:
+            with jobs_lock:
+                jobs[job_id].update(status="failed", error=str(error).split("\n")[0][:250])
+        finally:
+            busy.release()
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):
@@ -73,7 +127,25 @@ def run_dashboard(port: int = 8765) -> None:
                 return
             path = urlsplit(self.path).path
             if path == "/api/status":
-                self.send(200, {"providers": provider_status(), "synthetic": True})
+                self.send(200, {"providers": provider_status(), "synthetic": True, "budget": local_budget_status()})
+            elif path == "/api/recorded-episode":
+                try:
+                    result = read_recorded(["results/demo/meta-sequential-demo.json", "runs/meta-sequential-demo.json"])
+                    self.send(200, {"mode": "recorded", "episode": result})
+                except FileNotFoundError:
+                    self.send(404, {"error": "No recorded Meta episode is available. Execute a conventional episode to explore the twin without spending credits."})
+            elif path == "/api/evaluation":
+                try:
+                    self.send(200, read_recorded(["results/evaluation-v2/summary.json", "runs/evaluation-v2/summary.json",
+                                                "results/evaluation-v1/summary.json", "runs/evaluation-v1/summary.json"]))
+                except FileNotFoundError:
+                    self.send(404, {"error": "No completed evaluation summary is available yet."})
+            elif path.startswith("/api/jobs/"):
+                job_id = path.removeprefix("/api/jobs/")
+                with jobs_lock:
+                    job = jobs.get(job_id)
+                    snapshot = {**job, "progress": list(job["progress"]), "frames": list(job["frames"])} if job else None
+                self.send(200 if snapshot else 404, snapshot or {"error": "Unknown execution job"})
             elif path in assets:
                 name, content_type = assets[path]
                 self.send(200, files("factory_lab").joinpath("web", name).read_bytes(), content_type)
@@ -84,7 +156,7 @@ def run_dashboard(port: int = 8765) -> None:
             if not self.local_request():
                 return
             path = urlsplit(self.path).path
-            if path not in {"/api/compare", "/api/agent"}:
+            if path not in {"/api/compare", "/api/agent", "/api/episode"}:
                 self.send(404, {"error": "Not found"})
                 return
             if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
@@ -94,18 +166,32 @@ def run_dashboard(port: int = 8765) -> None:
                 length = int(self.headers.get("Content-Length", "0"))
                 if not 1 <= length <= 8192:
                     raise ValueError("Request must be between 1 and 8192 bytes")
-                request = RunRequest.model_validate_json(self.rfile.read(length))
-                if request.machine not in load_demo().machines:
+                raw = self.rfile.read(length)
+                request = EpisodeRequest.model_validate_json(raw) if path == "/api/episode" else RunRequest.model_validate_json(raw)
+                if isinstance(request, RunRequest) and request.machine not in load_demo().machines:
                     raise ValueError("Unknown machine")
                 if request.provider not in {"baseten", "meta"}:
                     raise ValueError("Unknown provider")
-                if request.repair_at <= request.outage_at:
+                if isinstance(request, RunRequest) and request.repair_at <= request.outage_at:
                     raise ValueError("Repair time must follow outage time")
             except ValueError:
                 self.send(400, {"error": "Check machine, provider, and times. Repair must follow the outage; use whole minutes."})
                 return
             if not busy.acquire(blocking=False):
                 self.send(409, {"error": "An experiment is already running. Wait for it to finish."})
+                return
+            if path == "/api/episode":
+                job_id = uuid4().hex[:16]
+                with jobs_lock:
+                    for old in list(jobs):
+                        if len(jobs) < 8:
+                            break
+                        if jobs[old]["status"] != "running":
+                            del jobs[old]
+                    jobs[job_id] = {"job_id": job_id, "status": "running", "progress": [],
+                                    "frames": [], "scenario": load_demo().model_dump(), "policy": request.policy}
+                Thread(target=episode_worker, args=(job_id, request), daemon=True).start()
+                self.send(202, {"job_id": job_id, "status": "running"})
                 return
             try:
                 report = run_comparison(load_demo(), outage_at=request.outage_at,

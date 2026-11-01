@@ -1,6 +1,6 @@
 # Factory Recovery Lab: MVP specification
 
-Decision recorded October 31, 2026. This describes intended behavior, not an implemented or validated system.
+Initial specification recorded October 31, 2026. The core is now implemented; see PLAN.md and EVALUATION.md for actual status, measured outcomes, and remaining limits.
 
 ## Product and user
 
@@ -82,7 +82,7 @@ If adaptive timing adds no value, report it and reassess the claim. Preserve use
 
 Defer ERP integrations, physical machine control, model training, elaborate 3D graphics, multi-agent orchestration, and arbitrary factory imports.
 
-Only after the core demo, evaluation, README, and submission assets are complete, consider satellite-component manufacturing as an additional scenario. Use meaningful constraints such as shared qualification equipment and mandatory test precedence. An orbital simulator is outside this build.
+Satellite manufacturing, orbital simulation, drones, robotics hardware, ERP integration, and unrelated extensions are excluded from this submission scope.
 
 ## Technical references
 

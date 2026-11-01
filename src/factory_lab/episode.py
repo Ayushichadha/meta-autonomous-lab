@@ -139,6 +139,8 @@ def run_episode(scenario: Scenario, events: list[WorldEvent], *, policy: str = "
     failures = []
     frames.append({"time": 0, "events": [], "state": state.model_dump(), "plan": plan.model_dump(),
                    "factory": factory_observation(scenario, state, plan), "decision": None})
+    if on_frame:
+        on_frame(frames[0])
     horizon = max([0, *(e.time for e in ordered), *(o.release for o in scenario.orders)]) + sum(max(o.durations.values()) for o in scenario.operations.values()) + 120
     event_times = set(grouped)
     ticks = set(range(config.interval_minutes, horizon + 1, config.interval_minutes))
@@ -200,6 +202,16 @@ def run_episode(scenario: Scenario, events: list[WorldEvent], *, policy: str = "
                 decision["action"] = "REPLAN" if actual_change else "PERSIST"
                 decision["time"] = time
                 decision["constraint_errors"] = []
+                objectives = {c["policy"]: candidate_score(c) for c in decision["candidates"]}
+                chosen_metrics = decision["predicted_metrics"]
+                decision["verified_evidence"] = {
+                    "candidate_objectives": objectives,
+                    "selected_objective": objectives[decision["selected_policy"]],
+                    "best_tested_objective": min(objectives.values()),
+                    "summary": f"{decision['action']}: forecast priority-weighted delay {chosen_metrics['weighted_tardiness_minutes']} min; "
+                               f"{chosen_metrics['on_time_orders']}/{chosen_metrics['total_orders']} orders on time; "
+                               f"{chosen_metrics['rerouted_operations']} reroutes; {chosen_metrics['queued_start_shift_minutes']} min queued start shifts. "
+                               "These measurements are forecasts, not realized outcomes."}
                 revisions += int(actual_change)
                 m = measure(scenario, simulate(scenario, state, plan).snapshot, plan=plan, reference=guard, decision_state=state)
                 reroutes += m["rerouted_operations"]

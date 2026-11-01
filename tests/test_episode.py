@@ -92,6 +92,17 @@ def test_impossible_progress_and_history_are_rejected():
         check_snapshot(small_shop(), Snapshot(now=5, progress={"one/cut": Progress(machine="A", started_at=4, worked=3)}))
 
 
+def test_same_machine_can_fail_again_without_losing_accumulated_work():
+    events = trace(18) + [WorldEvent(time=20, kind="outage", machine="A", estimated_repair_at=30),
+                          WorldEvent(time=28, kind="repaired", machine="A")]
+    result = run_episode(small_shop(), events, policy="preserve", initial_plan=hand_plan(),
+                         config=EpisodeConfig(interval_minutes=5, solve_seconds=.2))
+    assert result["complete"] and not result["failures"]
+    final = result["frames"][-1]["state"]["progress"]["one/cut"]
+    assert final["started_at"] == 0 and final["worked"] == 10
+    assert final["completed_at"] == 32
+
+
 @pytest.mark.parametrize("policy", ["preserve", "always_replan", "fixed_interval", "solver_selection"])
 def test_baselines_share_events_constraints_and_solver_budget(policy):
     config = EpisodeConfig(interval_minutes=5, solve_seconds=.2)

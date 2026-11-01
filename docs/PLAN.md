@@ -1,57 +1,30 @@
-# Factory recovery development plan
+# Implementation status — November 1, 2026
 
-Factory recovery was selected on October 31, 2026. The [MVP specification](FACTORY_MVP.md) defines the product, evaluation, and scope boundaries.
+Factory recovery is the selected scope for the Indie Developer / Push the Frontier entry. Preserve the working architecture. No satellite, drone, hardware, ERP, or unrelated extensions are planned for this submission.
 
-## Implementation progress
+## Completed milestones
 
-- Implemented: scenario models, SimPy execution, CP-SAT scheduling, independent schedule validation, pause/resume semantics, three conventional recovery candidates, and repair-uncertainty trials.
-- Live-verified November 1: Meta Muse Spark 1.3 tool calling and a complete three-experiment recovery decision. Baseten remains unverified. Local credentials are ignored by Git.
-- Implemented: local browser dashboard with incident controls, candidate comparisons, machine state, schedule timelines, per-order delivery forecasts, and run export. Browser-checked on the narrow preview with default and alternate outages.
-- Remaining: sequential updates, event extraction, policy-level benchmark, Modal batches, interface refinement, deployment, and submission assets.
+1. **Audit:** repository/components/dashboard reviewed; baseline 22 offline tests recorded in `AUDIT_2026-11-01.md`.
+2. **Live integration and cost control:** actual Meta Muse Spark 1.3 function calls and complete recovery decisions verified; owner-only local credentials ignored by Git; local $1 guard, output/request limits, usage accounting, and no automatic retries.
+3. **Sequential simulation:** actual outages and confirmed repairs separated from forecasts; estimate changes and expired-estimate handling; multiple outages; consistent queue ordering and pause/resume; past work immutable; future event traces hidden from policies.
+4. **Autonomous supervision:** state inspection, explicit experiment hypotheses, bounded candidate tools, mandatory baseline, compact evidence, selection-only final turn, complete normalized traces, and explicit fallback failures.
+5. **Comparison:** preserve, always replan, fixed interval, strong conventional selector, and Meta. Two frozen evaluation versions, each with 20 conventional cases and three predeclared live Meta cases. Version 1 failures retained; version 2 completed without fallback. No superiority claim.
+6. **Operations console:** factory observation replay, actual/forecast Gantt, operation register and queues, hypotheses, tool trace, evidence-calculated decisions, model rationale labelled separately, final outcomes, paired evaluation, failures, JSON export, live job progress, and recorded-run mode. Original single-event interface retained at `/single`.
+7. **Reproducibility:** 41 passing offline tests, pinned local dependency snapshot, source/configuration hashes, all normalized compressed run artifacts, README, methodology, and a truthful three-minute demo script.
 
-## Confirmed constraints
+## Remaining verification and packaging
 
-- Solo participant in the Indie Developer track.
-- Preferred problem statement: Push the Frontier.
-- Selected concept: autonomous factory recovery lab.
-- Python and PyTorch experience; MacBook Air for local development.
-- Approximately 5-6 working hours per day.
-- $150 Meta Model API credits activated; use Meta API as the primary inference provider now.
-- Partner credit applications submitted; approval is pending. Baseten/Modal remain optional later resources.
-- Dedicated public repository, with meaningful commits from the beginning.
-- Participant-guide deadline: November 4, 2026, 9 PM EST / November 5, 2026, 7:30 AM IST.
+- Browser replay, candidate inspection, a fresh conventional execution, and narrow-screen layout have been checked. Verify latest CI before handoff.
+- Public hosting: not deployed; local execution is working. Choose a suitable Python backend host when packaging the live product.
+- Submission video: script prepared; actual recording and public video link remain to be produced.
+- Verify submission fields, accessible code/video/demo links, and newly built contributions before submitting.
 
-## Decisions still open
+## Known limits
 
-1. Verify Muse Spark 1.3 on Meta Model API with a small real tool-use test; compare models after that works.
-2. UI framework after the simulator proof.
-3. Scenario parameters and objective weights, to be frozen before held-out evaluation.
+This is a simulation-based twin with synthetic instances, no real-factory connection, narrow recovery actions, and only three live Meta cases per evaluation version. Version 2's Meta mean weighted delay was 550.33 on its paired subset versus 546.33 for the strong conventional selector. One case traded fewer revisions for higher delay; two matched. Model narrative can overstate results, so tool-calculated evidence is shown separately.
 
-## Proposed milestones
+No more paid evaluation is needed for the current milestone. Reported development token charges through the recorded runs were approximately $0.6633, plus a conservative $0.0099 reservation for an unsuccessful request without reported usage. Provider billing is authoritative.
 
-These are planning targets, not completed work.
+## Deadline
 
-| Date (IST) | Target |
-| --- | --- |
-| October 31 | Prove the factory simulator, independent validator, and baseline work; test a real model tool call. |
-| November 1 | Complete the recovery loop with structured events, experiments, and recorded decisions. |
-| November 2 | Run comparative evaluation and held-out scenarios; build the functional dashboard. |
-| November 3 | Refine the interface and demonstration; address failure cases. |
-| November 4 | Freeze scope, record the three-minute video, verify public artifacts, and submit with buffer. |
-
-## Feasibility gate
-
-Before investing in presentation, demonstrate a trustworthy simulation, a functioning conventional baseline, and an agent capable of completing the experiment loop. Choose a smaller scope if simulation or integration takes too long. If adaptive supervision does not improve outcomes, investigate and report the evidence rather than claiming an advantage.
-
-## Repository practice
-
-- Make small commits after coherent changes: simulator, baseline, agent tools, evaluation, interface, and demo.
-- Record actual development history without backdating commits.
-- Stage specific files and inspect staged changes before pushing.
-- Keep credentials in local environment variables or provider secret stores.
-- Publish curated evaluation artifacts with configurations and seeds; inspect raw provider logs before publication.
-- Attribute reused work and distinguish it from new hackathon contributions.
-
-## Prize strategy
-
-Prioritize the main judging rubric: impact (30%), Meta tooling (25%), execution (20%), and demo (25%). Open-weight and agentic bonus awards are potential additional fits under the participant guide, not guaranteed eligibility or outcomes. Do not add features solely to chase additional categories.
+Participant-guide deadline: November 4, 2026, 9 PM EST / November 5, 2026, 7:30 AM IST. Target packaging and submission on November 4 IST with buffer. Prioritize reliability, clear evidence, and presentation over new scope.
