@@ -28,6 +28,8 @@ No policy can alter machine capabilities, durations, priorities, or objective we
 
 The Meta policy has at most six model calls per decision and twelve per episode. All clients share the local $1 estimated-dollar ledger. There are no automatic API retries. An episode failure preserves available evidence and receives a failure label; fallback outcomes cannot be presented as successful agent results.
 
+Protocol version 2 supplies the mandatory preserve forecast before the first model request; it is still counted as one of three experiments. The model chooses whether to test the remaining alternatives. Tool feedback is compact, with full measurements retained in artifacts. The final available request exposes only selection of an already tested plan. This change addresses request-budget failures observed in version 1, whose results are retained. Version 2 evaluation uses new seeds 11000-11019 and the predeclared Meta subset 11000-11002.
+
 ## Forecasts versus outcomes
 
 Candidate forecasts assume the current published repair times. Early/nominal/late trials vary only the focus outage; other down machines remain at their nominal estimates. They are representative stress tests, not an exhaustive robustness guarantee or a probability distribution.

@@ -1,0 +1,52 @@
+{
+  "version": 2,
+  "frozen_on": "2026-11-01",
+  "generator": "factory_lab.evaluation.generate_case_v1",
+  "seeds": [
+    11000,
+    11001,
+    11002,
+    11003,
+    11004,
+    11005,
+    11006,
+    11007,
+    11008,
+    11009,
+    11010,
+    11011,
+    11012,
+    11013,
+    11014,
+    11015,
+    11016,
+    11017,
+    11018,
+    11019
+  ],
+  "baseline_policies": [
+    "preserve",
+    "always_replan",
+    "fixed_interval",
+    "solver_selection"
+  ],
+  "planned_meta_subset": [
+    11000,
+    11001,
+    11002
+  ],
+  "meta_coverage_note": "Three preselected cases subject to the existing $1 local estimated-dollar guard. Unattempted cases remain explicitly unmeasured.",
+  "episode_config": {
+    "interval_minutes": 30,
+    "solve_seconds": 0.5,
+    "max_agent_requests": 12,
+    "expired_estimate_extension": 30
+  },
+  "objective_weights": {
+    "priority_weighted_tardiness": 100,
+    "queued_start_shift": 1,
+    "rerouted_operation": 30,
+    "makespan": 1
+  },
+  "protocol_change": "Mandatory deterministic preserve baseline preloaded; compact evidence feedback; final request reserved for selection. Version 1 outcomes are retained as failed-budget evidence."
+}

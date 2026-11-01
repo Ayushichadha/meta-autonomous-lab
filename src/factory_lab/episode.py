@@ -266,12 +266,12 @@ def demo_events() -> list[WorldEvent]:
             WorldEvent(time=118, kind="repaired", machine="CNC-A", source="Maintenance confirms CNC-A returned to service.")]
 
 
-def live_supervisor(provider: str = "meta", *, solve_seconds: float = .5):
+def live_supervisor(provider: str = "meta", *, solve_seconds: float = .5, on_progress=None):
     """New bounded client per decision; all share the persistent dollar ledger."""
     def decide(scenario, state, reference, incident, history, event):
         from .agent import supervise
         from .provider import ModelClient
         return supervise(ModelClient(provider), scenario, state, reference, incident,
                          time_limit=solve_seconds, observed_event=event, decision_history=history,
-                         max_requests=min(6, event["remaining_episode_model_requests"]))
+                         max_requests=min(6, event["remaining_episode_model_requests"]), on_progress=on_progress)
     return decide

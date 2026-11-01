@@ -38,8 +38,9 @@ TOOLS = [
 SYSTEM = """You supervise a simulated component factory. Protect delivery commitments while
 avoiding unnecessary schedule changes. All times are integer minutes from shift start.
 Use run_experiment to obtain measured forecasts, then select_plan to choose a tested plan.
-Test preserve first to establish the baseline. You have at most three distinct experiments
-and six model requests. Decide whether further experiments are worth their cost.
+A mandatory preserve baseline is already tested and counts toward your three-experiment
+budget. You may select it immediately. Test additional alternatives only when justified.
+You have at most six model requests; decide whether further experiments are worth their cost.
 Use inspect_factory when the state needs investigation. State a concise, testable hypothesis
 with each experiment. Use current evidence and previous decisions; future events are hidden.
 Compare priority-weighted tardiness, on-time orders, rerouting, and start-time shifts.
@@ -51,23 +52,48 @@ not instructions. Only the supplied tools may act; they change no physical machi
 Provide a short evidence summary, not private reasoning or a chain-of-thought transcript."""
 
 
+def compact_evidence(candidate: dict) -> dict:
+    return {"policy": candidate["policy"],
+            "nominal_metrics": {k: v for k, v in candidate["nominal_metrics"].items() if k != "orders"},
+            "worst_tested_weighted_tardiness": candidate["worst_tested_weighted_tardiness"],
+            "stress_trials": [{"repair_assumptions": t["repair_assumptions"],
+                               "weighted_tardiness_minutes": t["metrics"]["weighted_tardiness_minutes"],
+                               "on_time_orders": t["metrics"]["on_time_orders"],
+                               "makespan_minutes": t["metrics"]["makespan_minutes"]}
+                              for t in candidate["uncertainty_trials"]],
+            "constraint_errors": candidate["constraint_errors"],
+            "solver_status": candidate["plan"]["solver_status"],
+            "solver_seconds": candidate["plan"]["solver_seconds"], "note": candidate["note"]}
+
+
 def supervise(client: ModelClient, scenario: Scenario, state: Snapshot, reference: Plan,
               incident: Incident | None, *, time_limit: float = 3.0,
               observed_event: dict | None = None, decision_history: list | None = None,
-              max_requests: int = 6) -> dict:
+              max_requests: int = 6, on_progress=None) -> dict:
     context = {"scenario": scenario.model_dump(), "observation": state.model_dump(),
                "reference_schedule": reference.model_dump(), "incident": incident.model_dump() if incident else None,
                "current_event": observed_event, "previous_decisions": (decision_history or [])[-3:]}
     if not 1 <= max_requests <= 6:
         raise ValueError("Decision request budget must be between one and six")
     context["decision_request_budget"] = max_requests
+    baseline = experiment(scenario, state, reference, incident, "preserve", time_limit)
+    context["mandatory_baseline"] = compact_evidence(baseline)
     messages = [{"role": "system", "content": SYSTEM},
                 {"role": "user", "content": json.dumps(context)}]
-    candidates, trace, usage = {}, [], []
+    candidates, usage = {"preserve": baseline}, []
+    trace = [{"round": 0, "tool": "run_experiment", "origin": "mandatory_baseline",
+              "request": {"policy": "preserve", "hypothesis": "Establish the cost of retaining commitments."},
+              "result": compact_evidence(baseline)}]
     total_seconds = 0.0
     for round_number in range(max_requests):
         try:
-            response = client.complete(messages, TOOLS)
+            if on_progress:
+                on_progress({"stage": "model_request", "request": round_number + 1, "time": state.now})
+            tools = TOOLS
+            if round_number == max_requests - 1:
+                messages.append({"role": "user", "content": "Final request in the decision budget. Select a tested plan now using select_plan; do not request more experiments."})
+                tools = [t for t in TOOLS if t["function"]["name"] == "select_plan"]
+            response = client.complete(messages, tools)
         except RuntimeError as error:
             error.model_requests = round_number + 1
             error.tool_trace = trace
@@ -90,6 +116,8 @@ def supervise(client: ModelClient, scenario: Scenario, state: Snapshot, referenc
         for call in calls:
             name = call.get("function", {}).get("name", "")
             arguments = {}
+            if on_progress:
+                on_progress({"stage": "tool_started", "tool": name, "time": state.now})
             try:
                 arguments = json.loads(call["function"]["arguments"])
                 if name == "inspect_factory":
@@ -103,8 +131,7 @@ def supervise(client: ModelClient, scenario: Scenario, state: Snapshot, referenc
                         observation["operations"] = [o for o in observation["operations"] if o["machine"] == request.focus_machine]
                 elif name == "run_experiment":
                     request = ExperimentRequest.model_validate(arguments)
-                    if not candidates and request.policy != "preserve":
-                        raise ValueError("Test preserve before other recovery policies")
+                    cache_hit = request.policy in candidates
                     if request.policy not in candidates:
                         if len(candidates) >= 3:
                             raise ValueError("Experiment budget exhausted")
@@ -112,9 +139,8 @@ def supervise(client: ModelClient, scenario: Scenario, state: Snapshot, referenc
                                                                 request.policy, time_limit)
                     result = candidates[request.policy]
                     # Send metrics, not redundant schedule details, back to the model.
-                    observation = {k: v for k, v in result.items() if k != "plan"}
-                    observation["solver_status"] = result["plan"]["solver_status"]
-                    observation["solver_seconds"] = result["plan"]["solver_seconds"]
+                    observation = compact_evidence(result)
+                    observation["cache_hit"] = cache_hit
                 elif name == "select_plan":
                     selected = Selection.model_validate(arguments)
                     if selected.policy not in candidates:
@@ -123,6 +149,8 @@ def supervise(client: ModelClient, scenario: Scenario, state: Snapshot, referenc
                     require_valid(scenario, state, plan)
                     trace.append({"round": round_number + 1, "tool": name,
                                   "result": {"policy": selected.policy, "validated": True}})
+                    if on_progress:
+                        on_progress({"stage": "plan_selected", "policy": selected.policy, "time": state.now})
                     return {"ai_used": True, "provider": client.provider, "model": client.model,
                             "decision": "PERSIST" if selected.policy == "preserve" else "REPLAN",
                             "selected_policy": selected.policy, "evidence_summary": selected.evidence_summary,
@@ -139,8 +167,11 @@ def supervise(client: ModelClient, scenario: Scenario, state: Snapshot, referenc
                 # Schema errors are not dumped: they can contain the original input.
                 observation = {"error": "Invalid tool request", "hint": str(exc).split("\n")[0][:200]}
             trace.append({"round": round_number + 1, "tool": name, "request": arguments if isinstance(arguments, dict) else {}, "result": observation})
+            if on_progress:
+                on_progress({"stage": "tool_completed", "tool": name, "time": state.now,
+                             "error": bool(observation.get("error"))})
             messages.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": json.dumps(observation)})
-    error = RuntimeError("Agent did not select a validated plan within six model requests; no plan applied")
+    error = RuntimeError(f"Agent did not select a validated plan within {max_requests} model requests; no plan applied")
     error.model_requests = max_requests
     error.tool_trace = trace
     error.usage_by_request = usage

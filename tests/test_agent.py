@@ -41,11 +41,11 @@ def test_agent_requires_tested_candidate_before_selection():
     result = supervise(client, *context(), time_limit=.2)
     assert result["decision"] == "PERSIST"
     assert len(result["experiments"]) == 1
-    assert result["trace"][0]["result"]["error"] == "Invalid tool request"
+    assert any(t["result"].get("error") == "Invalid tool request" for t in result["trace"])
     assert result["model_requests"] == 3
 
 
-def test_agent_cannot_skip_baseline_or_execute_unknown_tool():
+def test_agent_has_mandatory_baseline_and_cannot_execute_unknown_tool():
     client = ScriptedClient([
         ("run_experiment", {"policy": "reroute"}),
         ("run_shell", {"command": "untrusted"}),
@@ -54,14 +54,15 @@ def test_agent_cannot_skip_baseline_or_execute_unknown_tool():
         ("select_plan", {"policy": "preserve", "evidence_summary": "Fixture evidence"}),
     ])
     result = supervise(client, *context(), time_limit=.2)
-    assert len(result["experiments"]) == 1
-    assert result["trace"][0]["result"]["error"]
-    assert result["trace"][1]["result"]["error"]
+    assert len(result["experiments"]) == 2
+    assert result["trace"][0]["origin"] == "mandatory_baseline"
+    assert any(t["result"].get("error") for t in result["trace"])
+    assert any(t["result"].get("cache_hit") for t in result["trace"])
 
 
 def test_agent_stops_at_request_budget_without_selecting():
     client = ScriptedClient([("unknown", {})] * 6)
-    with pytest.raises(RuntimeError, match="six model requests"):
+    with pytest.raises(RuntimeError, match="6 model requests"):
         supervise(client, *context(), time_limit=.2)
 
 
