@@ -36,4 +36,4 @@ Reproduce with `factory-lab demo`. The JSON output contains scenario inputs, obs
 
 ## Not yet verified
 
-Live Meta/Baseten inference, token pricing, sequential-update policies, held-out performance, Modal execution, real factory assumptions, and public deployment remain unverified. No API key is included in this repository.
+Update November 1: Meta tool calling and one complete recovery decision are live-verified; token-cost estimation uses published standard rates. See `examples/first-meta-run.summary.json`. Baseten, sequential-update policies, held-out performance, Modal, real factory assumptions, and deployment remain unverified. No API key is included in this repository.

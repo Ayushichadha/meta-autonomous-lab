@@ -2,7 +2,7 @@
 
 An autonomous engineering experiment lab being developed for the Meta Global AI Developer Hackathon 2026, Indie Developer track, under the **Push the Frontier** problem statement.
 
-**Status: first implementation, October 31, 2026.** The local simulator, constraint-checked scheduler, conventional recovery experiments, and browser dashboard work. A bounded Meta-model tool loop is implemented; live provider verification is pending local credentials. These are synthetic development experiments, not real-factory validation or evidence of AI superiority. The repository retains its original name, `meta-autonomous-lab`.
+**Status: first implementation, October 31, 2026.** The local simulator, constraint-checked scheduler, conventional recovery experiments, and browser dashboard work. A bounded Meta-model tool loop is implemented; a live Muse Spark 1.3 tool-call check and one complete factory decision succeeded on November 1. These are synthetic development experiments, not real-factory validation or evidence of AI superiority. The repository retains its original name, `meta-autonomous-lab`.
 
 ## Run locally
 
@@ -40,7 +40,7 @@ factory-lab agent --provider meta
 
 `smoke` verifies the configured model is in the provider catalog and returns a real function call. `agent` lets the model choose bounded experiments and select a validated plan, saving `runs/agent.json`. Missing credentials or failed model requests produce an error; they never silently switch to a simulated model. Meta Model API is the default and uses `META_API_KEY` or `MODEL_API_KEY`. It draws from the activated $150 Meta credits. Partner credit applications are pending; use `--provider baseten` only when its account is ready.
 
-Model dollar cost is left unset until provider pricing is verified; token usage and request duration are recorded.
+Meta token cost is estimated from reported usage and standard prices checked November 1, 2026. The local `runs/meta-usage.jsonl` ledger enforces a conservative $1 development allowance; this is not a provider-side billing limit. Requests are capped at six per client, prompts at 60,000 serialized bytes, and output at 1,024 tokens by default. Unknown usage retains a reservation. No automatic network retries are made. The first complete live decision cost approximately $0.0199 in reported token usage; see `examples/first-meta-run.summary.json`.
 
 ## Implementation boundaries
 

@@ -100,8 +100,8 @@ def supervise(client: ModelClient, scenario: Scenario, state: Snapshot, referenc
                             "experiments": list(candidates.values()), "trace": trace,
                             "model_requests": round_number + 1, "usage_by_request": usage,
                             "model_seconds": total_seconds,
-                            "cost_usd": None,
-                            "cost_note": "Token usage recorded; dollar cost requires verified provider pricing.",
+                            "cost_usd": getattr(client, "cost_usd", None),
+                            "cost_note": "Estimated from reported tokens and Meta standard prices checked 2026-11-01; provider billing is authoritative.",
                             "scope": "One simulated decision. Evidence summary is model-generated; metrics are tool-calculated."}
                 else:
                     raise ValueError("Unknown tool")

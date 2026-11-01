@@ -1,11 +1,14 @@
 """Small explicit provider boundary. No credentials or raw HTTP errors are logged."""
 
 import os
+import json
 from pathlib import Path
 from time import perf_counter
 
 import httpx
 from dotenv import load_dotenv
+
+from .budget import BudgetLedger, rates
 
 
 class ProviderError(RuntimeError):
@@ -29,6 +32,9 @@ class ModelClient:
         if not key or not key.strip():
             raise ProviderError(f"No {provider} API key configured. Add it to the local .env file; never paste it into logs.")
         self._key = key.strip()
+        self.requests = 0
+        self.cost_usd = 0.0
+        self.ledger = BudgetLedger() if provider == "meta" else None
 
     def _request(self, method: str, path: str, payload=None) -> dict:
         try:
@@ -38,8 +44,14 @@ class ModelClient:
         except httpx.RequestError:
             raise ProviderError(f"{self.provider} network request failed; check connectivity and try again.") from None
         if response.status_code >= 300:
-            # Raw provider bodies can echo request material; keep errors bounded.
-            raise ProviderError(f"{self.provider} returned HTTP {response.status_code}. Check credentials, model access, rate limits, and provider status.")
+            # Read only the bounded error message and remove any echoed key.
+            try:
+                error = response.json().get("error", {})
+                detail = str(error.get("message", "")) if isinstance(error, dict) else ""
+            except (ValueError, AttributeError):
+                detail = ""
+            detail = detail.replace(self._key, "[redacted]")[:250]
+            raise ProviderError(f"{self.provider} returned HTTP {response.status_code}. {detail or 'Check credentials, model access, rate limits, and provider status.'}")
         try:
             return response.json()
         except ValueError:
@@ -48,12 +60,39 @@ class ModelClient:
     def models(self) -> list[str]:
         return [m["id"] for m in self._request("GET", "/models").get("data", []) if "id" in m]
 
-    def complete(self, messages: list[dict], tools: list[dict]) -> dict:
+    def complete(self, messages: list[dict], tools: list[dict], *, max_tokens: int = 1024,
+                 tool_choice="auto", reasoning_effort: str = "low") -> dict:
+        if self.provider == "meta" and tool_choice != "auto":
+            raise ValueError("Meta API supports only automatic tool choice; no request sent")
+        if self.requests >= 6:
+            raise ProviderError("Model request limit reached; no request sent")
+        if not 1 <= max_tokens <= 2048:
+            raise ValueError("Output cap must be between 1 and 2048 tokens")
+        input_bytes = len(json.dumps({"messages": messages, "tools": tools}, ensure_ascii=True).encode())
+        if input_bytes > 60000:
+            raise ProviderError("Prompt exceeded the local size limit; no request sent")
+        request_id = None
+        if self.ledger:
+            input_rate, _, output_rate = rates(self.model)
+            # Byte count plus overhead is deliberately conservative; this is an
+            # application estimate, not a token-counting or billing guarantee.
+            reserve = ((input_bytes + 4096) * input_rate + max_tokens * output_rate) / 1e6
+            request_id = self.ledger.reserve(self.model, reserve)
+        self.requests += 1
         start = perf_counter()
-        data = self._request("POST", "/chat/completions", {
+        payload = {
             "model": self.model, "messages": messages, "tools": tools,
-            "tool_choice": "auto", "max_tokens": 2048,
-        })
+            "tool_choice": tool_choice, "max_tokens": max_tokens,
+        }
+        if self.provider == "meta":
+            payload["reasoning_effort"] = reasoning_effort
+        data = self._request("POST", "/chat/completions", payload)
+        cost = self.ledger.settle(request_id, self.model, data.get("usage", {})) if self.ledger else None
+        if cost is not None:
+            if self.cost_usd is not None:
+                self.cost_usd += cost
+        else:
+            self.cost_usd = None
         try:
             choice = data["choices"][0]
             message = choice["message"]
@@ -64,4 +103,5 @@ class ModelClient:
         if choice.get("finish_reason") == "length":
             raise ProviderError("Model output hit its token cap; no incomplete decision was applied")
         return {"message": message, "usage": data.get("usage", {}),
-                "seconds": perf_counter() - start, "model": data.get("model", self.model)}
+                "seconds": perf_counter() - start, "model": data.get("model", self.model),
+                "estimated_cost_usd": cost}

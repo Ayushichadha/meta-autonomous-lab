@@ -75,12 +75,14 @@ def main():
                 tool = function("acknowledge", "Acknowledge the connectivity test", {
                     "type": "object", "properties": {"ok": {"type": "boolean", "enum": [True]}},
                     "required": ["ok"], "additionalProperties": False})
-                reply = client.complete([{"role": "user", "content": 'Call acknowledge with {"ok": true}.'}], [tool])
+                reply = client.complete([{"role": "user", "content": 'Call acknowledge with {"ok": true}.'}], [tool],
+                    max_tokens=1024, reasoning_effort="minimal")
                 calls = reply["message"].get("tool_calls", [])
                 if not calls or calls[0]["function"]["name"] != "acknowledge" or json.loads(calls[0]["function"]["arguments"]) != {"ok": True}:
                     raise ValueError("Model did not return the expected tool call; provider integration is not verified")
                 print(json.dumps({"provider": client.provider, "model": client.model, "tool_call_verified": True,
-                                  "usage": reply["usage"], "seconds": reply["seconds"]}, indent=2))
+                                  "usage": reply["usage"], "seconds": reply["seconds"],
+                                  "estimated_cost_usd": reply.get("estimated_cost_usd")}, indent=2))
             else:
                 scenario = load_demo()
                 reference, state, incident = prepare(scenario, time_limit=args.solve_seconds)

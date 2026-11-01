@@ -1,0 +1,271 @@
+{
+  "model": "muse-spark-1.3",
+  "provider": "meta",
+  "decision": "REPLAN",
+  "selected_policy": "reroute",
+  "evidence_summary": "Tested preserve, reschedule, reroute (OPTIMAL forecasts for repair 95/115/135, not outcomes). Nominal weighted tardiness: preserve 919, reschedule 681, reroute 401. Worst-trial: 1250 vs 941 vs 508. Makespan: 292/295/252. Start-shift: 1501/997/913. Rerouted ops: 0/0/3. On-time: 1/4/2. Reroute minimizes weighted tardiness, makespan, shift and worst-case (objective 41355 vs 69392 vs 93693) at cost of 3 reroutes with 12-min overhead and fewer fully on-time orders than reschedule (2 vs 4), but much lower priority-weighted delay. Selected reroute.",
+  "model_requests": 3,
+  "usage_by_request": [
+    {
+      "completion_tokens": 170,
+      "prompt_tokens": 2929,
+      "total_tokens": 3099,
+      "completion_tokens_details": {
+        "reasoning_tokens": 101
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    {
+      "completion_tokens": 191,
+      "prompt_tokens": 4544,
+      "total_tokens": 4735,
+      "completion_tokens_details": {
+        "reasoning_tokens": 74
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    {
+      "completion_tokens": 598,
+      "prompt_tokens": 7746,
+      "total_tokens": 8344,
+      "completion_tokens_details": {
+        "reasoning_tokens": 365
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 2929
+      }
+    }
+  ],
+  "cost_usd": 0.019877600000000002,
+  "cost_note": "Estimated from reported tokens and Meta standard prices checked 2026-11-01; provider billing is authoritative.",
+  "model_seconds": 7.324105165986111,
+  "recorded_on": "2026-11-01",
+  "kind": "recorded_live_integration_check",
+  "synthetic": true,
+  "held_out": false,
+  "candidates": [
+    {
+      "policy": "preserve",
+      "nominal_metrics": {
+        "weighted_tardiness_minutes": 919,
+        "on_time_orders": 1,
+        "total_orders": 8,
+        "makespan_minutes": 292,
+        "rerouted_operations": 0,
+        "queued_start_shift_minutes": 1501,
+        "changed_queued_operations": 17,
+        "orders": [
+          {
+            "order": "ORD-01",
+            "due": 100,
+            "completed_at": 162,
+            "priority": 3,
+            "tardiness_minutes": 62
+          },
+          {
+            "order": "ORD-02",
+            "due": 120,
+            "completed_at": 180,
+            "priority": 2,
+            "tardiness_minutes": 60
+          },
+          {
+            "order": "ORD-03",
+            "due": 145,
+            "completed_at": 212,
+            "priority": 3,
+            "tardiness_minutes": 67
+          },
+          {
+            "order": "ORD-04",
+            "due": 155,
+            "completed_at": 227,
+            "priority": 1,
+            "tardiness_minutes": 72
+          },
+          {
+            "order": "ORD-05",
+            "due": 180,
+            "completed_at": 267,
+            "priority": 2,
+            "tardiness_minutes": 87
+          },
+          {
+            "order": "ORD-06",
+            "due": 195,
+            "completed_at": 56,
+            "priority": 1,
+            "tardiness_minutes": 0
+          },
+          {
+            "order": "ORD-07",
+            "due": 215,
+            "completed_at": 292,
+            "priority": 2,
+            "tardiness_minutes": 77
+          },
+          {
+            "order": "ORD-08",
+            "due": 235,
+            "completed_at": 247,
+            "priority": 1,
+            "tardiness_minutes": 12
+          }
+        ]
+      },
+      "worst_tested_weighted_tardiness": 1250,
+      "constraint_errors": [],
+      "solver_status": "OPTIMAL"
+    },
+    {
+      "policy": "reschedule",
+      "nominal_metrics": {
+        "weighted_tardiness_minutes": 681,
+        "on_time_orders": 4,
+        "total_orders": 8,
+        "makespan_minutes": 295,
+        "rerouted_operations": 0,
+        "queued_start_shift_minutes": 997,
+        "changed_queued_operations": 13,
+        "orders": [
+          {
+            "order": "ORD-01",
+            "due": 100,
+            "completed_at": 162,
+            "priority": 3,
+            "tardiness_minutes": 62
+          },
+          {
+            "order": "ORD-02",
+            "due": 120,
+            "completed_at": 94,
+            "priority": 2,
+            "tardiness_minutes": 0
+          },
+          {
+            "order": "ORD-03",
+            "due": 145,
+            "completed_at": 212,
+            "priority": 3,
+            "tardiness_minutes": 67
+          },
+          {
+            "order": "ORD-04",
+            "due": 155,
+            "completed_at": 137,
+            "priority": 1,
+            "tardiness_minutes": 0
+          },
+          {
+            "order": "ORD-05",
+            "due": 180,
+            "completed_at": 295,
+            "priority": 2,
+            "tardiness_minutes": 115
+          },
+          {
+            "order": "ORD-06",
+            "due": 195,
+            "completed_at": 56,
+            "priority": 1,
+            "tardiness_minutes": 0
+          },
+          {
+            "order": "ORD-07",
+            "due": 215,
+            "completed_at": 247,
+            "priority": 2,
+            "tardiness_minutes": 32
+          },
+          {
+            "order": "ORD-08",
+            "due": 235,
+            "completed_at": 182,
+            "priority": 1,
+            "tardiness_minutes": 0
+          }
+        ]
+      },
+      "worst_tested_weighted_tardiness": 941,
+      "constraint_errors": [],
+      "solver_status": "OPTIMAL"
+    },
+    {
+      "policy": "reroute",
+      "nominal_metrics": {
+        "weighted_tardiness_minutes": 401,
+        "on_time_orders": 2,
+        "total_orders": 8,
+        "makespan_minutes": 252,
+        "rerouted_operations": 3,
+        "queued_start_shift_minutes": 913,
+        "changed_queued_operations": 17,
+        "orders": [
+          {
+            "order": "ORD-01",
+            "due": 100,
+            "completed_at": 175,
+            "priority": 3,
+            "tardiness_minutes": 75
+          },
+          {
+            "order": "ORD-02",
+            "due": 120,
+            "completed_at": 94,
+            "priority": 2,
+            "tardiness_minutes": 0
+          },
+          {
+            "order": "ORD-03",
+            "due": 145,
+            "completed_at": 155,
+            "priority": 3,
+            "tardiness_minutes": 10
+          },
+          {
+            "order": "ORD-04",
+            "due": 155,
+            "completed_at": 190,
+            "priority": 1,
+            "tardiness_minutes": 35
+          },
+          {
+            "order": "ORD-05",
+            "due": 180,
+            "completed_at": 210,
+            "priority": 2,
+            "tardiness_minutes": 30
+          },
+          {
+            "order": "ORD-06",
+            "due": 195,
+            "completed_at": 56,
+            "priority": 1,
+            "tardiness_minutes": 0
+          },
+          {
+            "order": "ORD-07",
+            "due": 215,
+            "completed_at": 232,
+            "priority": 2,
+            "tardiness_minutes": 17
+          },
+          {
+            "order": "ORD-08",
+            "due": 235,
+            "completed_at": 252,
+            "priority": 1,
+            "tardiness_minutes": 17
+          }
+        ]
+      },
+      "worst_tested_weighted_tardiness": 508,
+      "constraint_errors": [],
+      "solver_status": "OPTIMAL"
+    }
+  ]
+}
