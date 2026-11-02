@@ -1,40 +1,46 @@
 (() => {
   'use strict';
   const $ = id => document.getElementById(id);
+  const publicReplay = document.querySelector('meta[name="factory-demo-mode"]')?.content === 'public-replay';
+  const publicAssets = {'/api/status':'./data/status.json','/api/recorded-episode':'./data/episode.json','/api/recorded-note':'./data/note.json','/api/evaluation':'./data/evaluation.json'};
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const names = {preserve:'Preserve',reschedule:'Reorder',reroute:'Reroute',always_replan:'Always replan',fixed_interval:'Fixed interval',solver_selection:'Solver selection',meta:'Meta supervisor'};
   const colors = ['#30755a','#597a8b','#997447','#708953','#7c6c91','#398687','#a16f76','#94915c'];
   let episode = null, frameIndex = 0, preview = null, running = false, metaReady = false;
+  let sourceId = 'recorded', noteResult = null, noteId = null, noteContextKey = null;
   const status = (text,error=false) => { $('console-status').textContent=text; $('console-status').classList.toggle('error',error); };
   const fmt = value => Number.isFinite(value) ? Number(value.toFixed(2)).toLocaleString() : '—';
-  async function request(path, options) { const response=await fetch(path,options);const data=await response.json();if(!response.ok)throw Error(data.error||'Request failed');return data; }
-  function busy(value) {running=value;document.body.classList.toggle('running',value);$('start-episode').disabled=value;$('episode-policy').disabled=value;$('recorded').disabled=value;}
-  async function connection() {try {const data=await request('/api/status');metaReady=data.providers.meta.configured;$('credit-status').textContent=`Meta key ${metaReady?'configured':'not configured'} · local $1 guard${data.budget?` · $${data.budget.reserved_or_estimated_usd.toFixed(3)} recorded/reserved`:''}. Not the account balance.`;}catch(error){$('credit-status').textContent=error.message;}}
-  async function recorded() {try {const data=await request('/api/recorded-episode');episode=data.episode;frameIndex=Math.max(0,episode.frames.findIndex(f=>f.time===25));preview=null;render('RECORDED META EXECUTION');status('Loaded a recorded real Meta run. Replaying it spends no API credits.');}catch(error){status(error.message,true);}}
+  async function request(path, options) { if(publicReplay&&options?.method&&options.method!=='GET')throw Error('Public replay is read-only. Run locally for fresh simulation and inference.'); const target=publicReplay?publicAssets[path]:path; if(!target)throw Error('This action is available in the local application.'); const response=await fetch(target,options);const data=await response.json();if(!response.ok)throw Error(data.error||'Request failed');return data; }
+  function busy(value) {running=value;document.body.classList.toggle('running',value);$('start-episode').disabled=value||publicReplay;$('episode-policy').disabled=value||publicReplay;$('recorded').disabled=value; $('replay-note').disabled=value; updateNoteButtons();}
+  async function connection() {try {const data=await request('/api/status');metaReady=!publicReplay&&data.providers.meta.configured; updateNoteButtons();$('credit-status').textContent=publicReplay?'PUBLIC REPLAY · recorded real Meta runs. No key, account access, or inference charges. Run locally for new executions.':`Meta key ${metaReady?'configured':'not configured'} · local $1 guard${data.budget?` · $${data.budget.reserved_or_estimated_usd.toFixed(3)} recorded/reserved`:''}. Not the account balance.`;}catch(error){$('credit-status').textContent=error.message;}}
+  async function recorded() {try {const data=await request('/api/recorded-episode');episode=data.episode;sourceId='recorded';frameIndex=Math.max(0,episode.frames.findIndex(f=>f.time===25));preview=null;render('RECORDED META EXECUTION');status('Loaded a recorded real Meta run. Replaying it spends no API credits.');}catch(error){status(error.message,true);}}
   async function execute() {
     if(running)return;const policy=$('episode-policy').value;
     if(policy==='meta'&&!metaReady){status('Add your Meta key locally before starting a live model episode.',true);return;}
     busy(true);status(policy==='meta'?'Starting real Meta-supervised execution. Local credit guard is active.':'Executing the conventional simulation. No API credits used.');
     try {
       const job=await request('/api/episode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({policy,provider:'meta'})});
+      await followJob(job);
+    }catch(error){status(error.message,true);}finally{busy(false);connection();}
+  }
+  async function followJob(job) {
       while(true){
         const state=await request(`/api/jobs/${job.job_id}`);
         if(state.status==='running'&&state.frames.length&&(!episode||episode.run_id!==job.job_id||episode.frames.length!==state.frames.length)){
-          episode={run_id:job.job_id,scenario:state.scenario,policy:state.policy,frames:state.frames,realized_metrics:null,failures:[],limitations:['Live execution in progress; final results are not available yet.']};
+          sourceId=job.job_id;episode={run_id:job.job_id,scenario:state.scenario,policy:state.policy,frames:state.frames,realized_metrics:null,failures:[],limitations:['Live execution in progress; final results are not available yet.']};
           frameIndex=episode.frames.length-1;preview=null;render('LIVE EXECUTION · IN PROGRESS');
         }
         if(state.progress.length){const latest=state.progress.at(-1);status(`${latest.time!==undefined?`Minute ${latest.time} · `:''}${latest.stage.replaceAll('_',' ')}${latest.tool?` · ${latest.tool}`:''}${latest.request?` ${latest.request}`:''}`);}
-        if(state.status==='completed'){episode=state.result;frameIndex=episode.frames.length-1;preview=null;render('NEW EXECUTION · COMPLETED');status(`${episode.status.replaceAll('_',' ')} · ${episode.realized_metrics?.model_calls||0} model requests · ${episode.failures.length} failures/fallbacks.`);break;}
+        if(state.status==='completed'){episode=state.result;sourceId=job.job_id;frameIndex=episode.frames.length-1;preview=null;render('NEW EXECUTION · COMPLETED');status(`${episode.status.replaceAll('_',' ')} · ${episode.realized_metrics?.model_calls||0} model requests · ${episode.failures.length} failures/fallbacks.`);break;}
         if(state.status==='failed')throw Error(state.error);
         await new Promise(resolve=>setTimeout(resolve,500));
       }
-    }catch(error){status(error.message,true);}finally{busy(false);connection();}
   }
   function render(mode) {
-    const f=episode.frames[frameIndex];$('frame-slider').max=episode.frames.length-1;$('frame-slider').value=frameIndex;$('frame-slider').disabled=false;$('frame-time').textContent=f.time;$('execution-mode').textContent=mode||$('execution-mode').textContent;$('export-episode').disabled=false;
+    const f=episode.frames[frameIndex]; updateNoteButtons(); $('note-context').textContent=`Grounded at minute ${f.time} · source ${sourceId} · current outages: ${Object.entries(f.state.available_at).map(([m,t])=>`${m} expected at ${t}`).join(', ')||'none'}.`; $('frame-slider').max=episode.frames.length-1;$('frame-slider').value=frameIndex;$('frame-slider').disabled=false;$('frame-time').textContent=f.time;$('execution-mode').textContent=mode||$('execution-mode').textContent;$('export-episode').disabled=false;
     const counts={active:0,paused:0,queued:0,completed:0,blocked:0};for(const op of f.factory.operations)if(op.status in counts)counts[op.status]++;
     $('state-counts').innerHTML=Object.entries(counts).map(([k,v])=>`<span><b>${v}</b>${k}</span>`).join('');
-    $('event-buttons').innerHTML=episode.frames.map((frame,i)=>frame.events.length||i===0||i===episode.frames.length-1?`<button class="event-button" data-frame="${i}" aria-pressed="${i===frameIndex}">${frame.time}m · ${i===0?'Shift start':frame.events.length?esc(frame.events.map(e=>e.kind.replaceAll('_',' ')).join(' + ')):'Completed execution'}</button>`:'').join('');
+    $('event-buttons').innerHTML=episode.frames.map((frame,i)=>frame.events.length||i===0||i===episode.frames.length-1?`<button class="event-button" data-frame="${i}" aria-pressed="${i===frameIndex}">${frame.time}m · ${i===0?(frame.time===0?'Shift start':'Branch start'):frame.events.length?esc(frame.events.map(e=>e.kind.replaceAll('_',' ')).join(' + ')):'Completed execution'}</button>`:'').join('');
     for(const button of document.querySelectorAll('[data-frame]'))button.onclick=()=>{frameIndex=Number(button.dataset.frame);preview=null;render();};
     $('factory-machines').innerHTML=f.factory.machines.map(m=>`<div class="machine ${m.status==='down'?'down':''}"><div class="machine-name">${esc(m.machine)}<i></i></div><div class="machine-status">${esc(m.status)}</div><p>${m.current_operation?esc(m.current_operation):'No active operation'}</p><p>${m.status==='down'?`Forecast available: minute ${m.forecast_available_at}`:'Available to the dispatcher'}</p><p class="queue">QUEUE · ${m.queue.length?esc(m.queue.join(' → ')):'empty'}</p></div>`).join('');
     $('operation-register').innerHTML=f.factory.operations.map(o=>`<tr><td>${esc(o.operation)}</td><td>${esc(o.machine)}</td><td><span class="state-tag ${o.status}">${esc(o.status)}</span></td><td>${o.worked_minutes} min</td><td>${o.remaining_minutes} min</td></tr>`).join('');
@@ -52,7 +58,7 @@
     const shown=preview===null?f.plan:decision.candidates[preview].plan;$('episode-gantt').innerHTML=gantt(shown,f);$('gantt-caption').textContent=`${preview===null?'Enacted plan':'Candidate forecast preview · not applied'}. Executed work through minute ${f.time} is solid; remaining work is a forecast from this observation. Scroll horizontally on smaller screens.`;
     const m=episode.realized_metrics;
     $('realized-metrics').innerHTML=m?[[m.weighted_tardiness_minutes,'priority-weighted delay / min'],[`${m.on_time_orders}/${m.total_orders}`,'orders on time'],[m.revision_count,'optional plan revisions'],[m.rerouted_operations,'reroute transitions'],[m.model_calls,'model requests'],[Number.isFinite(m.estimated_model_cost_usd)?'$'+m.estimated_model_cost_usd.toFixed(3):'unknown','estimated model cost']].map(([v,label])=>`<div class="metric"><strong>${esc(v)}</strong><span>${esc(label)}</span></div>`).join(''):'<p class="muted">Episode did not finish; outcomes are unavailable.</p>';
-    $('episode-limitations').textContent=`Final metrics are from the complete recorded/executed shift, even when inspecting an earlier observation. Policy: ${names[episode.policy]}. ${episode.limitations.join(' ')}`;$('episode-failures').innerHTML=episode.failures.map(failure=>`<div class="failure">Minute ${failure.time??'—'} · ${esc(failure.error)} · ${esc(failure.fallback||'no fallback')}</div>`).join('');
+    $('episode-limitations').textContent=`Final metrics are from the complete recorded/executed shift, even when inspecting an earlier observation. Policy: ${names[episode.policy]}. ${episode.limitations.join(' ')}${episode.branch?' This is a new maintenance-note branch. Past observations are preserved; revision and model-use counters cover the branch only.':''}`;$('episode-failures').innerHTML=episode.failures.map(failure=>`<div class="failure">Minute ${failure.time??'—'} · ${esc(failure.error)} · ${esc(failure.fallback||'no fallback')}</div>`).join('');
   }
   function gantt(plan, frame) {
     const maximum=Math.ceil(Math.max(...plan.assignments.map(a=>a.end),frame.time)/50)*50||50,x=t=>110+t/maximum*840;
@@ -87,6 +93,44 @@
       $('scenario-results').innerHTML=s.rows.map(r=>`<tr><td>${r.seed}</td><td>${names[r.policy]}</td><td>${esc(r.status.replaceAll('_',' '))}</td><td>${fmt(r.metrics?.weighted_tardiness_minutes)}</td><td>${fmt(r.metrics?.model_calls)}</td></tr>`).join('');$('evaluation-failures').innerHTML=s.rows.flatMap(r=>r.failures.map(f=>`<div class="failure">Seed ${r.seed} / ${names[r.policy]} / minute ${f.time??'—'} · ${esc(f.error)}</div>`)).join('');
     }catch(error){$('evaluation-description').textContent=error.message;}
   }
+  function currentNoteKey() { return `${sourceId}:${frameIndex}:${$('maintenance-note').value.trim()}`; }
+  function updateNoteButtons() {
+    const valid=Boolean(noteId&&noteResult?.interpretation.status==='validated'&&noteResult.interpretation.events.length&&noteContextKey===currentNoteKey());
+    $('interpret-note').disabled=running||publicReplay||!metaReady||!episode; $('start-episode').disabled=running||publicReplay; $('episode-policy').disabled=running||publicReplay;
+    $('apply-note').disabled=running||publicReplay||!valid;
+    $('apply-note-meta').disabled=running||publicReplay||!valid||!metaReady;
+  }
+  function showNote(result, recorded=false) {
+    const value=result.interpretation;
+    $('note-result').className=`note-result ${value.status}`;
+    const headline=value.status==='validated'?'Claims independently validated.':value.status==='clarification_required'?'Clarification required — no update applied.':'Rejected — no update applied.';
+    $('note-result').innerHTML=`<strong>${headline}</strong>${recorded?'<p class="caption">Recorded real Meta extraction and completed branch. No new inference.</p>':'<p class="caption">The source recording is unchanged. Apply explicitly to create a new simulation branch.</p>'}${value.events.map(e=>`<div class="note-event"><b>${esc(e.machine)} · ${esc(e.kind.replaceAll('_',' '))}</b><br>${e.estimated_repair_at!==null?`New forecast availability: minute ${e.estimated_repair_at}`:'Confirmed repair observed now'} · observed at minute ${e.time}<br><span class="note-quote">“${esc(e.source)}”</span></div>`).join('')}${value.notices.map(n=>`<div class="note-event">${esc(n.machine)} · unchanged availability · no state change<br><span class="note-quote">“${esc(n.evidence)}”</span></div>`).join('')}${value.questions.map(q=>`<div class="note-event">Clarify: ${esc(q)}</div>`).join('')}${value.errors.map(e=>`<div class="note-event">${esc(e)}</div>`).join('')}<details><summary>Extracted claims and quoted evidence</summary><pre class="note-quote">${esc(JSON.stringify(value.proposed_claims,null,2))}</pre></details><p class="caption">${result.cache_hit?'Cached extraction reused; no new API charge.':recorded?'Recorded interpretation cost: ':'New interpretation token-cost estimate: '}${!result.cache_hit&&Number.isFinite(value.estimated_cost_usd)?'$'+value.estimated_cost_usd.toFixed(4):''} ${esc(value.validation_note)}</p>`;
+    updateNoteButtons();
+  }
+  async function interpretOperatorNote() {
+    if(running||!episode)return;
+    const text=$('maintenance-note').value.trim();if(!text){status('Enter a maintenance note first.',true);return;}
+    const context=currentNoteKey();busy(true);status('Meta is extracting claims. Independent grounding and state checks follow; no update is applied yet.');
+    try{
+      const result=await request('/api/interpret-note',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({note:text,source_id:sourceId,frame_index:frameIndex,provider:'meta'})});
+      noteResult=result;noteId=result.interpretation_id;noteContextKey=context;showNote(result);
+      status(`${result.interpretation.status.replaceAll('_',' ')} · ${result.interpretation.events.length} state-changing events · ${result.cache_hit?'cached, no new inference':'one Meta interpretation request'}.`);
+    }catch(error){status(error.message,true);}finally{busy(false);connection();}
+  }
+  async function applyNote(policy) {
+    if(running||!noteId||noteContextKey!==currentNoteKey())return;
+    busy(true);status('Revalidating the note against its exact source observation and creating a new recovery branch…');
+    try{const job=await request('/api/note-branch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({interpretation_id:noteId,policy,provider:'meta'})});await followJob(job);noteId=null;status('Validated note applied in a new branch. The source recording and completed work are unchanged.');}
+    catch(error){status(error.message,true);}finally{busy(false);connection();}
+  }
+  async function replayNote() {
+    if(running)return;
+    try{const data=await request('/api/recorded-note');episode=data.branch;sourceId='recorded-note';frameIndex=Math.max(0,episode.frames.findIndex(f=>f.time===data.interpretation.observed_at&&f.events.length));preview=null;noteId=null;noteResult={interpretation:data.interpretation};$('maintenance-note').value=data.interpretation.note;render('RECORDED NOTE BRANCH');showNote(noteResult,true);status('Loaded the recorded real note-to-recovery workflow. No new inference or simulation was run.');}
+    catch(error){status(error.message,true);}
+  }
+  $('interpret-note').onclick=interpretOperatorNote;$('apply-note').onclick=()=>applyNote('solver_selection');$('apply-note-meta').onclick=()=>applyNote('meta');$('replay-note').onclick=replayNote;
+  $('maintenance-note').oninput=()=>{noteId=null;noteResult=null;updateNoteButtons();$('note-result').className='note-result';$('note-result').textContent='Note changed. Interpret and validate before applying any update.';};
+  for(const button of document.querySelectorAll('[data-note-example]'))button.onclick=()=>{$('maintenance-note').value=button.dataset.noteExample;$('maintenance-note').dispatchEvent(new Event('input'));};
   $('frame-slider').oninput=()=>{frameIndex=Number($('frame-slider').value);preview=null;render();};$('start-episode').onclick=execute;$('recorded').onclick=recorded;$('refresh-evaluation').onclick=evaluation;
   $('export-episode').onclick=()=>{if(!episode)return;const url=URL.createObjectURL(new Blob([JSON.stringify(episode,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='factory-sequential-episode.json';a.click();URL.revokeObjectURL(url);};
   connection();recorded();evaluation();

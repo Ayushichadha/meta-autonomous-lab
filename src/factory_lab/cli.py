@@ -37,6 +37,13 @@ def main():
     evaluation.add_argument("--config", type=Path, default=Path("configs/evaluation-v1.json"))
     evaluation.add_argument("--output", type=Path, default=Path("runs/evaluation-v1"))
     evaluation.add_argument("--include-meta", action="store_true", help="Uses credits on the preselected subset only")
+    note = commands.add_parser("maintenance-note", help="Interpret a maintenance note with Meta, validate it, and optionally branch recovery")
+    note.add_argument("--text", required=True)
+    note.add_argument("--minute", type=int, default=55)
+    note.add_argument("--source", type=Path, default=Path("results/demo/meta-sequential-demo.json"))
+    note.add_argument("--apply", action="store_true", help="Apply validated claims in a new simulation branch")
+    note.add_argument("--policy", choices=["solver_selection", "meta"], default="solver_selection")
+    note.add_argument("--output", type=Path, default=Path("runs/maintenance-note.json"))
     demo = commands.add_parser("demo", help="Run the offline simulator and three conventional recovery candidates")
     demo.add_argument("--output", type=Path, default=Path("runs/demo.json"))
     demo.add_argument("--solve-seconds", type=float, default=3.0)
@@ -58,6 +65,24 @@ def main():
             if not 1024 <= args.port <= 65535:
                 raise ValueError("Port must be between 1024 and 65535")
             run_dashboard(args.port)
+        elif args.command == "maintenance-note":
+            from .branching import branch_context, run_note_branch
+            from .notes import interpret_note
+            from .provider import ModelClient
+            source = json.loads(args.source.read_text())
+            index = next((i for i,f in enumerate(source["frames"]) if f["time"] == args.minute), None)
+            if index is None:
+                raise ValueError("The source has no observation at that minute")
+            scenario, state, _ = branch_context(source, index)
+            interpretation = interpret_note(ModelClient("meta"), args.text, scenario, state)
+            report = {"kind": "maintenance_note_workflow", "interpretation": interpretation}
+            if args.apply and interpretation["status"] == "validated" and interpretation["events"]:
+                report["branch"] = run_note_branch(source, index, interpretation, policy=args.policy)
+            write_json(args.output, report)
+            print(json.dumps({"status": interpretation["status"], "events": interpretation["events"],
+                              "questions": interpretation["questions"], "errors": interpretation["errors"],
+                              "estimated_interpretation_cost_usd": interpretation["estimated_cost_usd"],
+                              "branch_status": report.get("branch", {}).get("status")}, indent=2))
         elif args.command == "evaluate":
             from .evaluation import evaluate
             report = evaluate(args.config, args.output, include_meta=args.include_meta)

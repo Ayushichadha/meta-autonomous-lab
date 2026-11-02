@@ -14,6 +14,7 @@ Built by Ayushi Chadha for the Meta Global AI Developer Hackathon 2026, **Indie 
 - A real Muse Spark 1.3 tool-using supervisor, with experiment/request budgets and explicit failure fallback.
 - Independent validation of schedules, including downtime, overlap, progress, and immutable completed work.
 - An operations console with observation replay, actual/forecast Gantt segments, queues, hypotheses, tool traces, decisions, and evaluation results.
+- Maintenance notes interpreted by Meta into quoted claims, independently checked and applied in a separate simulation branch. Missing or ambiguous estimates require clarification.
 - Frozen synthetic evaluation: 20 cases per version, four conventional policies, and three predeclared real-Meta cases per version. All outcomes and original failures are published.
 
 ## Run the console without spending credits
@@ -37,6 +38,12 @@ PYTHONPATH=src python -m factory_lab.cli episode --policy solver_selection
 ```
 
 The latter writes `runs/episode.json` with observations, enacted schedules, candidate forecasts, realized outcomes, compute usage, and failures.
+
+## Maintenance-note recovery
+
+Choose **Replay verified note · no API** to inspect a recorded real extraction and completed recovery branch. At minute 55, “CNC-A repair delayed by another 40 minutes” changes the previous estimate of 120 to 160, while “INSPECT remains available” causes no state change. The original recording stays intact.
+
+Locally, **Interpret & validate** makes one paid model call; **Apply in new branch** runs the conventional selector without inference, or choose the explicitly paid Meta supervisor. Grounding checks reject invented quotes and unknown machines, and distinguish forecasts from confirmed repairs. These checks do not establish the truth of an external operator report.
 
 ## Connect Meta for a new live execution
 
@@ -144,4 +151,4 @@ The factory application, sequential runner, scheduling integration, independent 
 
 Synthetic four-machine instances with known processing durations and exogenous failures are a narrow testbed. There is no industrial validation, sensor synchronization, ERP integration, or physical machine actuation. Stress trials are representative, not probabilistic guarantees. Three live evaluation cases are insufficient to establish general model reliability or superiority. Model-generated rationale is displayed separately from tool-calculated evidence because its narrative can overstate a comparison.
 
-The demo flow is in [docs/DEMO.md](docs/DEMO.md). Public hosting and a recorded submission video remain packaging work; no hosted deployment is claimed.
+The demo flow is in [docs/DEMO.md](docs/DEMO.md). A static public replay is built by `scripts/build_public_demo.py` and deployed through GitHub Pages. It contains only allowlisted synthetic recordings and evaluation data; new simulation and inference require the local application. A recorded submission video remains packaging work.

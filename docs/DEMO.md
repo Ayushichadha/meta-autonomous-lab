@@ -46,3 +46,9 @@ Suggested closing: "The contribution is a working, constrained experimentation l
 - No invented percentage improvements, model capabilities, customer claims, or telemetry.
 - The console defaults to conventional new executions. Choose paid Meta execution deliberately; do not rerun inference just to capture an unchanged screen.
 - Record the video, verify its public accessibility and duration, and link it from the submission. A finished video and public hosting are not yet produced by this repository.
+
+## Maintenance-note alternative (stronger interaction demo)
+
+At minute 55, show the maintenance inbox and choose **Replay verified note · no API**. The actual Meta extraction grounds the delay to a quoted sentence and changes the forecast from minute 120 to 160, not 95. INSPECT availability remains unchanged. The new branch tests preservation, reordering and rerouting, with separate forecasts and realized outcomes. The original recording remains available through **Load recorded Meta run**.
+
+For a live local recording, interpret the same note once, inspect its claims, and explicitly apply it in a new branch. Interpretation uses credits; the conventional branch does not. Public GitHub Pages hosting supports recorded inspection only, with inference controls disabled.

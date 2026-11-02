@@ -21,7 +21,7 @@ POLICIES = ("preserve", "always_replan", "fixed_interval", "solver_selection", "
 
 
 class WorldEvent(Model):
-    time: int = Field(ge=1)
+    time: int = Field(ge=0)
     kind: Literal["outage", "repair_estimate", "repaired"]
     machine: str
     estimated_repair_at: int | None = Field(default=None, ge=1)
@@ -104,15 +104,19 @@ def _decision(scenario, state, reference, incident, policy, config, callback, hi
 
 def run_episode(scenario: Scenario, events: list[WorldEvent], *, policy: str = "solver_selection",
                 config: EpisodeConfig | None = None, supervisor: Callable | None = None,
-                initial_plan: Plan | None = None, on_frame: Callable | None = None) -> dict:
+                initial_plan: Plan | None = None, on_frame: Callable | None = None,
+                starting_state: Snapshot | None = None) -> dict:
     """Run one policy on an exogenous trace. Future events never cross its boundary."""
     if policy not in POLICIES:
         raise ValueError("Unknown episode policy")
     config = config or EpisodeConfig()
     ordered = sorted(events, key=lambda event: event.time)
     grouped = defaultdict(list)
-    trace_down = set()
+    state = starting_state or Snapshot()
+    trace_down = set(state.available_at)
     for event in ordered:
+        if event.time < state.now:
+            raise ValueError("A branch cannot replay events earlier than its starting observation")
         if event.machine not in scenario.machines:
             raise ValueError("Trace references an unknown machine")
         if event.kind == "outage":
@@ -128,22 +132,21 @@ def run_episode(scenario: Scenario, events: list[WorldEvent], *, policy: str = "
     if trace_down:
         raise ValueError("Every outage needs a physical repair in the private trace")
     started = perf_counter()
-    state = Snapshot()
     plan = initial_plan or solve(scenario, state, time_limit=config.solve_seconds)
     require_valid(scenario, state, plan)
     original = plan
-    down: dict[str, tuple[int, int]] = {}  # Only currently observed outages/estimates.
+    down: dict[str, tuple[int, int]] = {m: (estimate, 0) for m, estimate in state.available_at.items()}
     history, frames, execution_events = [], [], []
     revisions = requests = reroutes = shifts = changed_operations = 0
     guard_seconds = experiment_seconds = 0.0
     failures = []
-    frames.append({"time": 0, "events": [], "state": state.model_dump(), "plan": plan.model_dump(),
+    frames.append({"time": state.now, "events": [], "state": state.model_dump(), "plan": plan.model_dump(),
                    "factory": factory_observation(scenario, state, plan), "decision": None})
     if on_frame:
         on_frame(frames[0])
     horizon = max([0, *(e.time for e in ordered), *(o.release for o in scenario.orders)]) + sum(max(o.durations.values()) for o in scenario.operations.values()) + 120
     event_times = set(grouped)
-    ticks = set(range(config.interval_minutes, horizon + 1, config.interval_minutes))
+    ticks = {t for t in range(config.interval_minutes, horizon + 1, config.interval_minutes) if t > state.now}
     checkpoints = sorted(event_times | ticks)
     for time in checkpoints:
         if all(p.completed_at is not None for p in state.progress.values()) and len(state.progress) == len(scenario.operations):

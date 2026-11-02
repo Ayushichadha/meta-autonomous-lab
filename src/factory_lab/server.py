@@ -3,6 +3,7 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 import json
+import hashlib
 import os
 from pathlib import Path
 from threading import Lock, Thread
@@ -28,6 +29,19 @@ class RunRequest(Model):
 class EpisodeRequest(Model):
     policy: Literal["preserve", "always_replan", "fixed_interval", "solver_selection", "meta"] = "solver_selection"
     provider: Literal["meta", "baseten"] = "meta"
+
+
+class NoteRequest(Model):
+    note: str = Field(min_length=1, max_length=2000)
+    source_id: str = Field(default="recorded", pattern=r"^(recorded|recorded-note|[a-f0-9]{16})$")
+    frame_index: int = Field(ge=0, le=2000)
+    provider: Literal["meta"] = "meta"
+
+
+class NoteBranchRequest(Model):
+    interpretation_id: str = Field(pattern=r"^[a-f0-9]{16}$")
+    policy: Literal["solver_selection", "meta"] = "solver_selection"
+    provider: Literal["meta"] = "meta"
 
 
 def local_budget_status() -> dict:
@@ -63,10 +77,49 @@ def run_dashboard(port: int = 8765) -> None:
     busy = Lock()
     jobs_lock = Lock()
     jobs = {}
+    note_records = {}
     allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
     assets = {"/": ("console.html", "text/html"), "/single": ("index.html", "text/html"),
               "/app.css": ("app.css", "text/css"), "/app.js": ("app.js", "text/javascript"),
               "/console.css": ("console.css", "text/css"), "/console.js": ("console.js", "text/javascript")}
+
+    def source_episode(source_id):
+        if source_id == "recorded":
+            return read_recorded(["results/demo/meta-sequential-demo.json", "runs/meta-sequential-demo.json"])
+        if source_id == "recorded-note":
+            return read_recorded(["results/notes/verified-note-workflow.json"])["branch"]
+        with jobs_lock:
+            source = jobs.get(source_id)
+            if not source or source["status"] != "completed":
+                raise ValueError("The source execution is no longer available; load the recorded run again")
+            return source["result"]
+
+    def branch_worker(job_id, request, record):
+        from .branching import run_note_branch
+        def progress(item):
+            with jobs_lock:
+                jobs[job_id]["progress"].append(item)
+                jobs[job_id]["progress"] = jobs[job_id]["progress"][-100:]
+        def frame_ready(frame):
+            with jobs_lock:
+                jobs[job_id]["frames"].append(frame)
+            progress({"stage": "branch_observation_recorded", "time": frame["time"]})
+        try:
+            result = run_note_branch(record["source"], record["frame_index"], record["interpretation"],
+                                     policy=request.policy, provider=request.provider,
+                                     on_frame=frame_ready, on_progress=progress)
+            result["run_id"] = job_id
+            destination = Path("runs") / (job_id + "-note-branch.json")
+            destination.parent.mkdir(exist_ok=True)
+            destination.write_text(json.dumps(result, indent=2) + "\n")
+            destination.chmod(0o600)
+            with jobs_lock:
+                jobs[job_id].update(status="completed", result=result)
+        except Exception as error:
+            with jobs_lock:
+                jobs[job_id].update(status="failed", error=str(error).split("\n")[0][:250])
+        finally:
+            busy.release()
 
     def episode_worker(job_id, request):
         from .episode import EpisodeConfig, demo_events, live_supervisor, run_episode
@@ -140,6 +193,11 @@ def run_dashboard(port: int = 8765) -> None:
                                                 "results/evaluation-v1/summary.json", "runs/evaluation-v1/summary.json"]))
                 except FileNotFoundError:
                     self.send(404, {"error": "No completed evaluation summary is available yet."})
+            elif path == "/api/recorded-note":
+                try:
+                    self.send(200, read_recorded(["results/notes/verified-note-workflow.json"]))
+                except FileNotFoundError:
+                    self.send(404, {"error": "No verified recorded note workflow is available yet."})
             elif path.startswith("/api/jobs/"):
                 job_id = path.removeprefix("/api/jobs/")
                 with jobs_lock:
@@ -156,7 +214,7 @@ def run_dashboard(port: int = 8765) -> None:
             if not self.local_request():
                 return
             path = urlsplit(self.path).path
-            if path not in {"/api/compare", "/api/agent", "/api/episode"}:
+            if path not in {"/api/compare", "/api/agent", "/api/episode", "/api/interpret-note", "/api/note-branch"}:
                 self.send(404, {"error": "Not found"})
                 return
             if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
@@ -167,7 +225,9 @@ def run_dashboard(port: int = 8765) -> None:
                 if not 1 <= length <= 8192:
                     raise ValueError("Request must be between 1 and 8192 bytes")
                 raw = self.rfile.read(length)
-                request = EpisodeRequest.model_validate_json(raw) if path == "/api/episode" else RunRequest.model_validate_json(raw)
+                schema = {"/api/episode": EpisodeRequest, "/api/interpret-note": NoteRequest,
+                          "/api/note-branch": NoteBranchRequest}.get(path, RunRequest)
+                request = schema.model_validate_json(raw)
                 if isinstance(request, RunRequest) and request.machine not in load_demo().machines:
                     raise ValueError("Unknown machine")
                 if request.provider not in {"baseten", "meta"}:
@@ -179,6 +239,54 @@ def run_dashboard(port: int = 8765) -> None:
                 return
             if not busy.acquire(blocking=False):
                 self.send(409, {"error": "An experiment is already running. Wait for it to finish."})
+                return
+            if path == "/api/interpret-note":
+                try:
+                    from .branching import branch_context
+                    from .notes import interpret_note
+                    from .provider import ModelClient
+                    source = source_episode(request.source_id)
+                    scenario, state, _ = branch_context(source, request.frame_index)
+                    model = os.getenv("META_MODEL") or dotenv_values(".env").get("META_MODEL") or "muse-spark-1.3"
+                    fingerprint = hashlib.sha256(json.dumps({"schema_version": 1, "note": request.note,
+                        "state": state.model_dump(), "scenario": scenario.model_dump(), "model": model}, sort_keys=True).encode()).hexdigest()
+                    cache = Path("runs/notes") / (fingerprint + ".json")
+                    if cache.exists():
+                        interpretation = json.loads(cache.read_text())
+                        cached = True
+                    else:
+                        interpretation = interpret_note(ModelClient("meta"), request.note, scenario, state)
+                        cache.parent.mkdir(parents=True, exist_ok=True)
+                        cache.write_text(json.dumps(interpretation, indent=2) + "\n")
+                        cache.chmod(0o600)
+                        cached = False
+                    interpretation_id = uuid4().hex[:16]
+                    with jobs_lock:
+                        if len(note_records) >= 32:
+                            del note_records[next(iter(note_records))]
+                        note_records[interpretation_id] = {"source": source, "frame_index": request.frame_index,
+                                                          "interpretation": interpretation}
+                    self.send(200, {"interpretation_id": interpretation_id, "interpretation": interpretation,
+                                    "cache_hit": cached, "new_request_cost_usd": 0.0 if cached else interpretation.get("estimated_cost_usd")})
+                except (ValueError, RuntimeError, FileNotFoundError) as error:
+                    self.send(422, {"error": str(error).split("\n")[0][:250]})
+                finally:
+                    busy.release()
+                return
+            if path == "/api/note-branch":
+                with jobs_lock:
+                    record = note_records.get(request.interpretation_id)
+                if not record or record["interpretation"]["status"] != "validated" or not record["interpretation"]["events"]:
+                    busy.release()
+                    self.send(422, {"error": "Interpret a fully validated state-changing note first. Clarifications and notices do not change the twin."})
+                    return
+                job_id = uuid4().hex[:16]
+                with jobs_lock:
+                    jobs[job_id] = {"job_id": job_id, "status": "running", "progress": [],
+                                   "frames": list(record["source"]["frames"][:record["frame_index"]]),
+                                   "scenario": record["source"]["scenario"], "policy": request.policy}
+                Thread(target=branch_worker, args=(job_id, request, record), daemon=True).start()
+                self.send(202, {"job_id": job_id, "status": "running"})
                 return
             if path == "/api/episode":
                 job_id = uuid4().hex[:16]
