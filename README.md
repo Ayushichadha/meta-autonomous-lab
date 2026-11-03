@@ -6,6 +6,10 @@ A machine breaks. Delivery commitments become uncertain. Factory Recovery Lab le
 
 Built by Ayushi Chadha for the Meta Global AI Developer Hackathon 2026, **Indie Developer / Push the Frontier**. This is a simulation-based digital twin prototype with synthetic manufacturing data; it is not connected to a physical factory.
 
+[![Offline tests](https://github.com/Ayushichadha/meta-autonomous-lab/actions/workflows/tests.yml/badge.svg)](https://github.com/Ayushichadha/meta-autonomous-lab/actions/workflows/tests.yml)
+
+[Public recorded demo](https://ayushichadha.github.io/meta-autonomous-lab/) · [Validation: 56 passing tests and fresh examples](docs/VALIDATION_2026-11-03.md)
+
 ## What works
 
 - Sequential outages, changing repair estimates, confirmed repairs, and multiple down machines.
