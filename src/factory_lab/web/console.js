@@ -2,7 +2,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const publicReplay = document.querySelector('meta[name="factory-demo-mode"]')?.content === 'public-replay';
-  const publicAssets = {'/api/status':'./data/status.json','/api/recorded-episode':'./data/episode.json','/api/recorded-note':'./data/note.json','/api/evaluation':'./data/evaluation.json'};
+  const publicAssets = {'/api/status':'./data/status.json','/api/recorded-episode':'./data/episode.json','/api/recorded-note':'./data/note.json','/api/evaluation':'./data/evaluation.json','/api/recorded-research':'./data/research.json'};
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const names = {preserve:'Preserve',reschedule:'Reorder',reroute:'Reroute',always_replan:'Always replan',fixed_interval:'Fixed interval',solver_selection:'Solver selection',meta:'Meta supervisor'};
   const colors = ['#30755a','#597a8b','#997447','#708953','#7c6c91','#398687','#a16f76','#94915c'];
@@ -13,9 +13,11 @@
   const status = (text,error=false) => { $('console-status').textContent=text; $('console-status').classList.toggle('error',error); };
   const fmt = value => Number.isFinite(value) ? Number(value.toFixed(2)).toLocaleString() : '—';
   async function request(path, options) { if(publicReplay&&options?.method&&options.method!=='GET')throw Error('Public replay is read-only. Run locally for fresh simulation and inference.'); const target=publicReplay?publicAssets[path]:path; if(!target)throw Error('This action is available in the local application.'); const response=await fetch(target,options);const data=await response.json();if(!response.ok)throw Error(data.error||'Request failed');return data; }
-  function busy(value) {if(value)stopPlayback();running=value;document.body.classList.toggle('running',value);$('start-episode').disabled=value||publicReplay;$('episode-policy').disabled=value||publicReplay;$('recorded').disabled=value; $('replay-note').disabled=value; updateNoteButtons();}
+  function busy(value) {if(value)stopPlayback();running=value;document.body.classList.toggle('running',value);$('start-episode').disabled=value||publicReplay;$('episode-policy').disabled=value||publicReplay;$('recorded').disabled=value; $('recorded-research').disabled=value; $('replay-note').disabled=value; updateNoteButtons();}
   async function connection() {try {const data=await request('/api/status');metaReady=!publicReplay&&data.providers.meta.configured; notesReady=data.capabilities?.maintenance_notes!==false; updateNoteButtons();$('credit-status').textContent=publicReplay?'PUBLIC REPLAY · recorded real Meta runs. No key, account access, or inference charges. Run locally for new executions.':`Meta key ${metaReady?'configured':'not configured'} · application $${data.budget?.limit_usd||1} guard${data.budget?` · $${data.budget.reserved_or_estimated_usd.toFixed(3)} recorded/reserved`:''}. Not the account balance.`;}catch(error){$('credit-status').textContent=error.message;}}
   async function recorded() {stopPlayback();try {const data=await request('/api/recorded-episode');episode=data.episode;sourceId='recorded';$('playback-status').textContent='Playback advances recorded observations; no new inference.';setProgress('observe','Recorded run loaded. Use Play shift to inspect observations.');frameIndex=Math.max(0,episode.frames.findIndex(f=>f.time===25));preview=null;render('RECORDED META EXECUTION');status('Loaded a recorded real Meta run. Replaying it spends no API credits.');}catch(error){status(error.message,true);}}
+  async function recordedResearch(){if(running)return;stopPlayback();try{const data=await request('/api/recorded-research');episode=data.episode;sourceId='recorded-research';frameIndex=Math.max(0,episode.frames.findIndex(f=>f.decision?.diagnostic_trials?.length&&f.decision.candidates?.length>1));preview=null;noteId=null;render('RECORDED META RESEARCH EXECUTION');setProgress('complete','Recorded real Meta investigation. Select observations to inspect its requested stress tests.');status('Loaded recorded real research run. No inference credits used.');}catch(error){status(error.message,true);}}
+
   async function execute() {
     if(running)return;const policy=$('episode-policy').value;
     if(policy==='meta'&&!metaReady){status('Add your Meta key locally before starting a live model episode.',true);return;}
@@ -62,7 +64,7 @@
     const shown=preview===null?f.plan:decision.candidates[preview].plan;$('episode-gantt').innerHTML=gantt(shown,f);$('gantt-caption').textContent=`${preview===null?'Enacted plan':'Candidate forecast preview · not applied'}. Executed work through minute ${f.time} is solid; remaining work is a forecast from this observation. Scroll horizontally on smaller screens.`;
     const m=episode.realized_metrics;
     $('realized-metrics').innerHTML=m?[[m.weighted_tardiness_minutes,'priority-weighted delay / min'],[`${m.on_time_orders}/${m.total_orders}`,'orders on time'],[m.revision_count,'optional plan revisions'],[m.rerouted_operations,'reroute transitions'],[m.model_calls,'model requests'],[Number.isFinite(m.estimated_model_cost_usd)?'$'+m.estimated_model_cost_usd.toFixed(3):'unknown','estimated model cost']].map(([v,label])=>`<div class="metric"><strong>${esc(v)}</strong><span>${esc(label)}</span></div>`).join(''):'<p class="muted">Episode did not finish; outcomes are unavailable.</p>';
-    $('episode-limitations').textContent=`Final metrics are from the complete recorded/executed shift, even when inspecting an earlier observation. Policy: ${names[episode.policy]}. ${episode.limitations.join(' ')}${episode.branch?' This is a new maintenance-note branch. Past observations are preserved; revision and model-use counters cover the branch only.':''}`;$('episode-failures').innerHTML=episode.failures.map(failure=>`<div class="failure">Minute ${failure.time??'—'} · ${esc(failure.error)} · ${esc(failure.fallback||'no fallback')}</div>`).join('');
+    $('episode-limitations').textContent=`Final metrics are from the complete recorded/executed shift, even when inspecting an earlier observation. Policy: ${names[episode.policy]}. Additional agent-requested stress replays: ${m?.diagnostic_simulation_calls||0}. ${episode.limitations.join(' ')}${episode.branch?' This is a new maintenance-note branch. Past observations are preserved; revision and model-use counters cover the branch only.':''}`;$('episode-failures').innerHTML=episode.failures.map(failure=>`<div class="failure">Minute ${failure.time??'—'} · ${esc(failure.error)} · ${esc(failure.fallback||'no fallback')}</div>`).join('');
   }
 
   function factoryFlow(frame){
@@ -221,7 +223,7 @@
     }catch(error){status(error.message,true);}finally{busy(false);connection();}
   }
   $('voice-record').onclick=toggleRecording;$('transcribe-audio').onclick=transcribeAudio;$('maintenance-audio').onchange=async()=>{busy(true);try{const file=$('maintenance-audio').files[0];if(file)await prepareAudio(file,file.name);}catch(error){status(error.message,true);}finally{busy(false);}};
-  $('episode-policy').onchange=updateNoteButtons;
+  $('episode-policy').onchange=updateNoteButtons; $('recorded-research').onclick=recordedResearch;
 
   connection();sampleImage();evaluation();
 })();

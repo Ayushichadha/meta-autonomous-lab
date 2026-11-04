@@ -29,3 +29,11 @@ def test_stress_tool_not_enabled_for_old_protocol():
         ('select_plan',{'policy':'preserve','evidence_summary':'Fixture'})])
     result=supervise(client,*context(),time_limit=.2)
     assert not result['diagnostic_trials'] and any(t['result'].get('error') for t in result['trace'])
+
+
+def test_third_distinct_stress_trial_is_rejected():
+    calls=[('stress_test_plan',{'policy':'preserve','extra_delay_minutes':delay,'hypothesis':'Probe an explicit later repair.'}) for delay in (15,30,60)]
+    calls.append(('select_plan',{'policy':'preserve','evidence_summary':'Use only admitted evidence.'}))
+    result=supervise(ScriptedClient(calls),*context(),time_limit=.2,enable_stress_tests=True)
+    assert len(result['diagnostic_trials'])==2
+    assert any(t['result'].get('error') for t in result['trace'])

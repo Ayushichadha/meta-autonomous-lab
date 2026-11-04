@@ -13,6 +13,7 @@ def build(destination: Path) -> None:
         "data/status.json": {"read_only": True, "providers": {"meta": {"configured": False}, "baseten": {"configured": False}}, "budget": None},
         "data/episode.json": {"mode": "recorded", "episode": json.loads((ROOT/"results/demo/meta-sequential-demo.json").read_text())},
         "data/note.json": json.loads((ROOT/"results/notes/verified-note-workflow.json").read_text()),
+        "data/research.json": {"episode":json.loads((ROOT/"results/research/meta-stress-demo.json").read_text())},
         "data/evaluation.json": json.loads((ROOT/"results/evaluation-v2/summary.json").read_text()),
     }
     web = ROOT/"src/factory_lab/web"

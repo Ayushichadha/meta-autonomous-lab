@@ -5,13 +5,14 @@ Factory recovery is the selected scope for the Indie Developer / Push the Fronti
 ## Completed milestones
 
 1. **Audit:** repository/components/dashboard reviewed; baseline 22 offline tests recorded in `AUDIT_2026-11-01.md`.
-2. **Live integration and cost control:** actual Meta Muse Spark 1.3 function calls and complete recovery decisions verified; owner-only local credentials ignored by Git; local $1 guard, output/request limits, usage accounting, and no automatic retries.
+2. **Live integration and cost control:** actual Meta Muse Spark 1.3 function calls and complete recovery decisions verified; owner-only local credentials ignored by Git; local $1 default / hosted $3 total guard, output/request limits, usage accounting, and no automatic retries.
 3. **Sequential simulation:** actual outages and confirmed repairs separated from forecasts; estimate changes and expired-estimate handling; multiple outages; consistent queue ordering and pause/resume; past work immutable; future event traces hidden from policies.
 4. **Autonomous supervision:** state inspection, explicit experiment hypotheses, bounded candidate tools, mandatory baseline, compact evidence, selection-only final turn, complete normalized traces, and explicit fallback failures.
 5. **Comparison:** preserve, always replan, fixed interval, strong conventional selector, and Meta. Two frozen evaluation versions, each with 20 conventional cases and three predeclared live Meta cases. Version 1 failures retained; version 2 completed without fallback. No superiority claim.
 6. **Operations console:** factory observation replay, actual/forecast Gantt, operation register and queues, hypotheses, tool trace, evidence-calculated decisions, model rationale labelled separately, final outcomes, paired evaluation, failures, JSON export, live job progress, and recorded-run mode. Original single-event interface retained at `/single`.
 7. **Multimodal interaction:** Muse Spark image reading, review-required editable transcription, typed note validation and detached recovery branches; actual two-request visual workflow verified. Play/pause/restart/speed controls and actual worker-event progress are available.
-8. **Reproducibility:** 68 passing offline tests, pinned local dependency snapshot, source/configuration hashes, all normalized compressed run artifacts, README, methodology, and a truthful three-minute demo script.
+8. **Voice and research tools:** Dedicated Muse Voice Transcribe, local audio preview and explicit review; bounded model-requested late-repair tests with separate evidence and compute accounting. Frozen benchmarks keep their original protocol.
+9. **Reproducibility:** 80 passing offline tests, pinned local dependency snapshot, source/configuration hashes, all normalized compressed run artifacts, README, methodology, and a truthful three-minute demo script.
 
 ## Remaining verification and packaging
 

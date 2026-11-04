@@ -1,0 +1,80 @@
+{
+  "scope": "Synthetic voice transcript reviewed and corrected, then independently validated. Not an ASR accuracy benchmark.",
+  "original_transcription": "CNC A repair delayed by another 40 minutes. INSPECT remains remains available..",
+  "reviewed_operator_report": "CNC A repair delayed by another 40 minutes. INSPECT remains available.",
+  "review_correction": "Removed repeated word and duplicated punctuation after checking the synthetic source.",
+  "result": {
+    "interpretation_id": "2e0b7acb894a4a26",
+    "interpretation": {
+      "status": "validated",
+      "errors": [],
+      "questions": [],
+      "events": [
+        {
+          "time": 55,
+          "kind": "repair_estimate",
+          "machine": "CNC-A",
+          "estimated_repair_at": 160,
+          "uncertainty_minutes": 0,
+          "source": "CNC A repair delayed by another 40 minutes."
+        }
+      ],
+      "notices": [
+        {
+          "machine": "INSPECT",
+          "kind": "available_notice",
+          "evidence": "INSPECT remains available.",
+          "state_change": false
+        }
+      ],
+      "proposed_claims": {
+        "claims": [
+          {
+            "kind": "repair_estimate",
+            "machine": "CNC-A",
+            "machine_evidence": "CNC A",
+            "context_reference": false,
+            "evidence": "CNC A repair delayed by another 40 minutes.",
+            "timing": {
+              "mode": "delay_previous",
+              "minutes": 40,
+              "evidence": "delayed by another 40 minutes"
+            }
+          },
+          {
+            "kind": "available_notice",
+            "machine": "INSPECT",
+            "machine_evidence": "INSPECT",
+            "context_reference": false,
+            "evidence": "INSPECT remains available.",
+            "timing": {
+              "mode": "not_given",
+              "minutes": null,
+              "evidence": ""
+            }
+          }
+        ],
+        "clarification_questions": []
+      },
+      "validation_note": "Grounding and consistency checks validate a synthetic operator update, not the truth of an external report.",
+      "ai_used": true,
+      "model": "muse-spark-1.3",
+      "note": "CNC A repair delayed by another 40 minutes. INSPECT remains available.",
+      "observed_at": 55,
+      "usage": {
+        "completion_tokens": 392,
+        "prompt_tokens": 1202,
+        "total_tokens": 1594,
+        "completion_tokens_details": {
+          "reasoning_tokens": 191
+        },
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      },
+      "estimated_cost_usd": 0.0031685,
+      "seconds": 3.557992211
+    },
+    "cache_hit": false
+  }
+}

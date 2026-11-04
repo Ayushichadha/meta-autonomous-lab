@@ -8,7 +8,7 @@ Built by Ayushi Chadha for the Meta Global AI Developer Hackathon 2026, **Indie 
 
 [![Offline tests](https://github.com/Ayushichadha/meta-autonomous-lab/actions/workflows/tests.yml/badge.svg)](https://github.com/Ayushichadha/meta-autonomous-lab/actions/workflows/tests.yml)
 
-[Live hosted application](https://ayushichadha--factory-recovery-lab-web.us-east.modal.run/) · [Recorded replay](https://ayushichadha.github.io/meta-autonomous-lab/) · [Validation: 68 passing tests and multimodal verification](docs/VALIDATION_2026-11-04.md)
+[Live hosted application](https://ayushichadha--factory-recovery-lab-web.us-east.modal.run/) · [Recorded replay](https://ayushichadha.github.io/meta-autonomous-lab/) · [Validation: multimodal verification and research extensions](docs/VALIDATION_2026-11-04.md)
 
 ## What works
 
@@ -47,6 +47,12 @@ PYTHONPATH=src python -m factory_lab.cli episode --policy solver_selection
 ```
 
 The latter writes `runs/episode.json` with observations, enacted schedules, candidate forecasts, realized outcomes, compute usage, and failures.
+
+## Spoken reports and research mode
+
+Choose **Replay Meta research run · no API** to inspect the actual verified investigation, including its extra-delay tests.
+
+The maintenance inbox supports a microphone recording or uploaded audio clip up to 20 seconds. **Transcribe with Meta** uses Muse Voice Transcribe; review the resulting text before validating or applying it. For live investigation, select Meta and check **Ask Meta to investigate late-repair risk**. The supervisor can choose bounded extra-delay experiments on tested plans. See [the workflow and protocol distinction](docs/VOICE_AND_RESEARCH.md).
 
 ## Image-to-recovery demonstration
 
@@ -147,7 +153,7 @@ Historical outputs are reproduced most closely by checking out their recorded so
 
 The `runs/meta-usage.jsonl` ledger enforces a **$1 local default allowance** and a **$3 hosted total allowance**, shared across model calls on that deployment, including voice transcription. The hosted ledger retains earlier development usage; it was not reset. This is an application guard, **not an account-wide billing limit**. Unknown usage retains a reservation. There are no automatic network retries.
 
-Defaults: 60,000 serialized prompt bytes, 1,024 generated tokens per request, six model requests per decision, twelve per episode, and three candidate experiments per decision. Meta cost estimates use reported token counts and [standard rates](https://dev.meta.ai/docs/pricing-rate-limits) checked November 1, 2026; provider billing is authoritative. The small allowance prevents a large evaluation from consuming the participant's full credit grant.
+Defaults: 60,000 serialized prompt bytes, 1,024 generated tokens per request, six model requests per decision, twelve per episode, and three candidate experiments per decision. Meta cost estimates use reported token counts and [standard rates](https://dev.meta.ai/docs/pricing-rate-limits) checked November 4, 2026; provider billing is authoritative. The small allowance prevents a large evaluation from consuming the participant's full credit grant.
 
 ## Research foundations and new work
 

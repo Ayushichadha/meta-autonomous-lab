@@ -1,0 +1,18 @@
+{
+  "scope": "Single synthetic speech integration check, not an ASR benchmark.",
+  "date": "2026-11-04",
+  "job_id": "8266cc32193746b8",
+  "source": "synthetic-maintenance.wav",
+  "result": {
+    "transcription": "CNC A repair delayed by another 40 minutes. INSPECT remains remains available..",
+    "model": "muse-voice-transcribe-1.0",
+    "review_required": true,
+    "state_changed": false,
+    "audio_sha256": "a3de5a9b9f191baa0569e6b26936e95d5904ac5237c130fb4272c082e68a4e90",
+    "duration_seconds": 5.262166666666666,
+    "processed_audio_ms": 5280,
+    "estimated_cost_usd": 0.00024999999999999995,
+    "seconds": 6.401658661000001,
+    "cache_hit": false
+  }
+}

@@ -17,7 +17,7 @@ def test_public_build_only_publishes_replay_assets(tmp_path):
     builder().build(tmp_path)
     files = {str(p.relative_to(tmp_path)) for p in tmp_path.rglob('*') if p.is_file()}
     assert files == {'index.html', 'console.css', 'console.js', '.nojekyll',
-                     'data/status.json', 'data/episode.json', 'data/note.json', 'data/evaluation.json'}
+                     'data/status.json', 'data/episode.json', 'data/note.json', 'data/evaluation.json', 'data/research.json'}
     html = (tmp_path/'index.html').read_text()
     assert 'content="public-replay"' in html
     assert 'src="./console.js"' in html

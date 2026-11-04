@@ -13,7 +13,7 @@ from pathlib import Path
 from uuid import uuid4
 
 PRICING_SOURCE = "https://dev.meta.ai/docs/pricing-rate-limits"
-PRICING_CHECKED = "2026-11-01"
+PRICING_CHECKED = "2026-11-04"
 
 
 def configured_limit() -> float:

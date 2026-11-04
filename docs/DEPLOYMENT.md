@@ -12,7 +12,7 @@ The inference allowance is an application estimate, not a provider billing cap o
 
 ## Deployment — November 4, 2026
 
-Live URL: https://ayushichadha--factory-recovery-lab-web.us-east.modal.run/ . Deployed to the participant’s approved Modal workspace using its existing $1 credit; no payment method was added. Conventional execution was verified through the public browser. The full offline suite passes 68 tests. The shared inference ledger was seeded from prior development usage, rather than reset at deployment. The original GitHub Pages URL remains the recorded replay.
+Live URL: https://ayushichadha--factory-recovery-lab-web.us-east.modal.run/ . Deployed to the participant’s approved Modal workspace using its existing $1 credit; no payment method was added. Conventional execution was verified through the public browser. The full offline suite passes 80 tests. The shared inference ledger was seeded from prior development usage, rather than reset at deployment. The original GitHub Pages URL remains the recorded replay.
 
 The first web-thread-based cloud Meta verification stalled; it is not counted as a successful run. The deployment was changed to detached workers with persistent job state and serialized admission. Failed attempts and unknown-usage reservations remain in the ledger.
 

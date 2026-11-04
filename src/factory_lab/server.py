@@ -34,7 +34,7 @@ class EpisodeRequest(Model):
 
 class NoteRequest(Model):
     note: str = Field(min_length=1, max_length=2000)
-    source_id: str = Field(default="recorded", pattern=r"^(recorded|recorded-note|[a-f0-9]{16})$")
+    source_id: str = Field(default="recorded", pattern=r"^(recorded|recorded-note|recorded-research|[a-f0-9]{16})$")
     frame_index: int = Field(ge=0, le=2000)
     provider: Literal["meta"] = "meta"
 
@@ -107,6 +107,8 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
     def source_episode(source_id):
         if source_id == "recorded":
             return read_recorded(["results/demo/meta-sequential-demo.json", "runs/meta-sequential-demo.json"])
+        if source_id == "recorded-research":
+            return read_recorded(["results/research/meta-stress-demo.json"])
         if source_id == "recorded-note":
             return read_recorded(["results/notes/verified-note-workflow.json"])["branch"]
         if cloud:
@@ -220,6 +222,11 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
                                                 "results/evaluation-v1/summary.json", "runs/evaluation-v1/summary.json"]))
                 except FileNotFoundError:
                     self.send(404, {"error": "No completed evaluation summary is available yet."})
+            elif path == "/api/recorded-research":
+                try:
+                    self.send(200,{"episode":read_recorded(["results/research/meta-stress-demo.json"])})
+                except FileNotFoundError:
+                    self.send(404,{"error":"No recorded research run is available yet."})
             elif path == "/api/recorded-note":
                 try:
                     self.send(200, read_recorded(["results/notes/verified-note-workflow.json"]))
