@@ -111,7 +111,7 @@
   async function interpretOperatorNote() {
     if(running||!episode||(visualNeedsReview&&!$('visual-reviewed').checked))return;
     const text=$('maintenance-note').value.trim();if(!text){status('Enter a maintenance note first.',true);return;}
-    const context=currentNoteKey();busy(true);status('Meta is extracting claims. Independent grounding and state checks follow; no update is applied yet.');
+    const context=currentNoteKey();busy(true);status('Checking the report, reusing cached analysis where available. No update is applied yet.');
     try{
       let result=await request('/api/interpret-note',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({note:text,source_id:sourceId,frame_index:frameIndex,provider:'meta'})});
       if(result.job_id)result=await analysisResult(result);
@@ -170,7 +170,7 @@
   async function sampleImage(){if(running)return;await recorded();frameIndex=episode.frames.findIndex(f=>f.time===55);preview=null;render();
     const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=650;const c=canvas.getContext('2d');c.fillStyle='#e5ece4';c.fillRect(0,0,1200,650);c.fillStyle='#fcfcf6';c.fillRect(35,35,1130,580);c.fillStyle='#1e4033';c.font='bold 26px sans-serif';c.fillText('SYNTHETIC DEMO · NOT REAL FACTORY DATA',75,95);c.font='bold 42px sans-serif';c.fillText('MAINTENANCE UPDATE',75,180);c.font='29px sans-serif';c.fillText('CNC-A repair delayed by another 40 minutes.',75,290);c.fillText('INSPECT remains available.',75,365);c.font='24px sans-serif';c.fillText('Observed at shift minute 55',75,510);chooseImage(canvas.toDataURL('image/png'),'Synthetic maintenance board · observation set to minute 55');
   }
-  async function readImage(){if(running||!imageData||imageRead||publicReplay)return;const data=imageData;busy(true);setProgress('observe','Sending one bounded image to Muse Spark.');status('Reading visual evidence. No update will be applied.');
+  async function readImage(){if(running||!imageData||imageRead||publicReplay)return;const data=imageData;busy(true);setProgress('observe','Submitting one bounded image; identical cached evidence will be reused.');status('Reading visual evidence. No update will be applied.');
     try{let result=await request('/api/interpret-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:data,provider:'meta'})});if(result.job_id)result=await analysisResult(result);
       const report=result.visual_report;imageRead=true;visualNeedsReview=true;$('visual-reviewed').checked=false;$('visual-review-label').hidden=false;$('maintenance-note').value=report.transcription;noteId=null;noteResult=null;
       $('visual-result').innerHTML='<strong>Model-read evidence · review required</strong><p>'+esc(report.observations.join(' '))+'</p>'+report.uncertainties.map(q=>'<p>Uncertainty: '+esc(q)+'</p>').join('')+'<p>Image reading cost: '+(result.cache_hit?'cached, no new inference':Number.isFinite(result.estimated_cost_usd)?'$'+result.estimated_cost_usd.toFixed(4):'unverified')+'. No factory state changed.</p>';

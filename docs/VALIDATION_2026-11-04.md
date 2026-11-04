@@ -11,3 +11,5 @@ These are software and integration checks on synthetic examples. They do not est
 The actual public UI completed image reading, explicit review, note validation and a fresh conventional recovery branch. Vision job `e18cb4fa0c1447f6` used Muse Spark 1.3 and cost an estimated $0.0033505; note job `0bd719c3d6d44fd2` cost $0.00289275. The combined interpretation cost was $0.00624325. Branch `4390216c5da14524` completed with no failures and no additional model requests. The checked estimate became minute 160 from a previous estimate of 120; INSPECT stayed unchanged.
 
 The source synthetic image and normalized proof are published in `results/vision/`. The proof records a single integration check, not a vision benchmark. No production image or credential is included. Browser console warnings/errors were empty during the checked interaction. Existing recorded observations and completed work were preserved.
+
+After redeployment, the same demo image reused its durable cached result with no new inference charge. Browser checks confirmed that Interpret is disabled until review is checked and disabled again when review is unchecked.

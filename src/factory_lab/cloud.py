@@ -52,7 +52,7 @@ def execute(job_id, kind, payload):
     try:
         if kind in {'image','note'}:
             from .provider import ModelClient
-            progress({'stage':'reading_image' if kind=='image' else 'validating_note'})
+            progress({'stage':'checking_cached_evidence'})
             import hashlib
             import os
             model=os.getenv('META_MODEL','muse-spark-1.3')
@@ -71,6 +71,7 @@ def execute(job_id, kind, payload):
             if cached:
                 analysis=json.loads(cache.read_text())
             else:
+                progress({'stage':'reading_image' if kind=='image' else 'validating_note'})
                 analysis=interpret_image(ModelClient('meta'),payload['image']) if kind=='image' else interpret_note(ModelClient('meta'),payload['note'],scenario,state)
                 cache.write_text(json.dumps(analysis));cache.chmod(0o600)
             if kind=='image':
