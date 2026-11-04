@@ -8,6 +8,7 @@ from contextlib import contextmanager
 import fcntl
 import json
 import math
+import os
 from pathlib import Path
 from uuid import uuid4
 
@@ -66,6 +67,10 @@ class BudgetLedger:
             stream.write(json.dumps({"request_id": request_id, "model": model, "status": "reserved",
                                      "charged_usd": amount, "pricing_checked": PRICING_CHECKED}) + "\n")
             stream.flush()
+            os.fsync(stream.fileno())
+            if os.getenv("FACTORY_MODAL_VOLUME"):
+                import modal
+                modal.Volume.from_name(os.environ["FACTORY_MODAL_VOLUME"]).commit()
             return request_id
 
     def settle(self, request_id: str, model: str, usage: dict) -> float | None:
@@ -77,4 +82,8 @@ class BudgetLedger:
                                      "charged_usd": cost, "usage": usage,
                                      "pricing_checked": PRICING_CHECKED}) + "\n")
             stream.flush()
+            os.fsync(stream.fileno())
+            if os.getenv("FACTORY_MODAL_VOLUME"):
+                import modal
+                modal.Volume.from_name(os.environ["FACTORY_MODAL_VOLUME"]).commit()
         return cost

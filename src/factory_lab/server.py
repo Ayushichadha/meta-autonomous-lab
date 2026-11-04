@@ -73,12 +73,12 @@ def provider_status() -> dict:
     }
 
 
-def run_dashboard(port: int = 8765) -> None:
+def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str | None = None) -> None:
     busy = Lock()
     jobs_lock = Lock()
     jobs = {}
     note_records = {}
-    allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
+    allowed_hosts = {public_host} if public_host else {f"127.0.0.1:{port}", f"localhost:{port}"}
     assets = {"/": ("console.html", "text/html"), "/single": ("index.html", "text/html"),
               "/app.css": ("app.css", "text/css"), "/app.js": ("app.js", "text/javascript"),
               "/console.css": ("console.css", "text/css"), "/console.js": ("console.js", "text/javascript")}
@@ -170,7 +170,7 @@ def run_dashboard(port: int = 8765) -> None:
                 self.send(403, {"error": "Local dashboard requests only"})
                 return False
             origin = self.headers.get("Origin")
-            if origin and origin not in {f"http://{host}" for host in allowed_hosts}:
+            if origin and origin not in {f"{scheme}://{host}" for host in allowed_hosts for scheme in (["https"] if public_host else ["http"])}:
                 self.send(403, {"error": "Cross-origin request rejected"})
                 return False
             return True
@@ -282,6 +282,11 @@ def run_dashboard(port: int = 8765) -> None:
                     return
                 job_id = uuid4().hex[:16]
                 with jobs_lock:
+                    for old in list(jobs):
+                        if len(jobs) < 8:
+                            break
+                        if jobs[old]["status"] != "running":
+                            del jobs[old]
                     jobs[job_id] = {"job_id": job_id, "status": "running", "progress": [],
                                    "frames": list(record["source"]["frames"][:record["frame_index"]]),
                                    "scenario": record["source"]["scenario"], "policy": request.policy}
@@ -322,7 +327,7 @@ def run_dashboard(port: int = 8765) -> None:
             finally:
                 busy.release()
 
-    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    server = ThreadingHTTPServer((bind, port), Handler)
     print(f"Factory Recovery Lab: http://127.0.0.1:{port}", flush=True)
     print("Local synthetic simulator. The Meta agent button uses API credits.", flush=True)
     try:
