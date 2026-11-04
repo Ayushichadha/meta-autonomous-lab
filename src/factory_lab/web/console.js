@@ -6,13 +6,13 @@
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const names = {preserve:'Preserve',reschedule:'Reorder',reroute:'Reroute',always_replan:'Always replan',fixed_interval:'Fixed interval',solver_selection:'Solver selection',meta:'Meta supervisor'};
   const colors = ['#30755a','#597a8b','#997447','#708953','#7c6c91','#398687','#a16f76','#94915c'];
-  let episode = null, frameIndex = 0, preview = null, running = false, metaReady = false;
+  let episode = null, frameIndex = 0, preview = null, running = false, metaReady = false, notesReady = true;
   let sourceId = 'recorded', noteResult = null, noteId = null, noteContextKey = null;
   const status = (text,error=false) => { $('console-status').textContent=text; $('console-status').classList.toggle('error',error); };
   const fmt = value => Number.isFinite(value) ? Number(value.toFixed(2)).toLocaleString() : '—';
   async function request(path, options) { if(publicReplay&&options?.method&&options.method!=='GET')throw Error('Public replay is read-only. Run locally for fresh simulation and inference.'); const target=publicReplay?publicAssets[path]:path; if(!target)throw Error('This action is available in the local application.'); const response=await fetch(target,options);const data=await response.json();if(!response.ok)throw Error(data.error||'Request failed');return data; }
   function busy(value) {running=value;document.body.classList.toggle('running',value);$('start-episode').disabled=value||publicReplay;$('episode-policy').disabled=value||publicReplay;$('recorded').disabled=value; $('replay-note').disabled=value; updateNoteButtons();}
-  async function connection() {try {const data=await request('/api/status');metaReady=!publicReplay&&data.providers.meta.configured; updateNoteButtons();$('credit-status').textContent=publicReplay?'PUBLIC REPLAY · recorded real Meta runs. No key, account access, or inference charges. Run locally for new executions.':`Meta key ${metaReady?'configured':'not configured'} · local $1 guard${data.budget?` · $${data.budget.reserved_or_estimated_usd.toFixed(3)} recorded/reserved`:''}. Not the account balance.`;}catch(error){$('credit-status').textContent=error.message;}}
+  async function connection() {try {const data=await request('/api/status');metaReady=!publicReplay&&data.providers.meta.configured; notesReady=data.capabilities?.maintenance_notes!==false; updateNoteButtons();$('credit-status').textContent=publicReplay?'PUBLIC REPLAY · recorded real Meta runs. No key, account access, or inference charges. Run locally for new executions.':`Meta key ${metaReady?'configured':'not configured'} · local $1 guard${data.budget?` · $${data.budget.reserved_or_estimated_usd.toFixed(3)} recorded/reserved`:''}. Not the account balance.`;}catch(error){$('credit-status').textContent=error.message;}}
   async function recorded() {try {const data=await request('/api/recorded-episode');episode=data.episode;sourceId='recorded';frameIndex=Math.max(0,episode.frames.findIndex(f=>f.time===25));preview=null;render('RECORDED META EXECUTION');status('Loaded a recorded real Meta run. Replaying it spends no API credits.');}catch(error){status(error.message,true);}}
   async function execute() {
     if(running)return;const policy=$('episode-policy').value;
@@ -96,7 +96,7 @@
   function currentNoteKey() { return `${sourceId}:${frameIndex}:${$('maintenance-note').value.trim()}`; }
   function updateNoteButtons() {
     const valid=Boolean(noteId&&noteResult?.interpretation.status==='validated'&&noteResult.interpretation.events.length&&noteContextKey===currentNoteKey());
-    $('interpret-note').disabled=running||publicReplay||!metaReady||!episode; $('start-episode').disabled=running||publicReplay; $('episode-policy').disabled=running||publicReplay;
+    $('interpret-note').disabled=running||publicReplay||!metaReady||!notesReady||!episode; $('interpret-note').title=notesReady?'':'Live note interpretation is available locally; hosted replay remains available.'; $('start-episode').disabled=running||publicReplay; $('episode-policy').disabled=running||publicReplay;
     $('apply-note').disabled=running||publicReplay||!valid;
     $('apply-note-meta').disabled=running||publicReplay||!valid||!metaReady;
   }

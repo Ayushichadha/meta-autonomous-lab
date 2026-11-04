@@ -47,6 +47,14 @@ class NoteBranchRequest(Model):
 def local_budget_status() -> dict:
     from .budget import BudgetLedger
     ledger = BudgetLedger()
+    if os.getenv("FACTORY_CLOUD_JOBS"):
+        import modal
+        try:
+            data = b"".join(modal.Volume.from_name("factory-recovery-state").read_file("/runs/meta-usage.jsonl"))
+            latest = {r["request_id"]:r for r in map(json.loads,data.splitlines())}
+            return {"limit_usd":1.0,"reserved_or_estimated_usd":sum(r["charged_usd"] for r in latest.values())}
+        except Exception:
+            return {"limit_usd":1.0,"reserved_or_estimated_usd":1.0,"note":"Usage unavailable; do not start inference."}
     with ledger.locked() as (_, records):
         latest = {r["request_id"]: r for r in records}
     return {"limit_usd": 1.0, "reserved_or_estimated_usd": sum(r["charged_usd"] for r in latest.values()),
@@ -68,12 +76,13 @@ def provider_status() -> dict:
     return {
         "baseten": {"configured": bool(value("BASETEN_API_KEY")),
                     "model": value("BASETEN_MODEL") or "meta-models/muse-spark-open-1026"},
-        "meta": {"configured": bool(value("META_API_KEY") or value("MODEL_API_KEY")),
+        "meta": {"configured": bool(value("META_API_KEY") or value("MODEL_API_KEY") or os.getenv("FACTORY_CLOUD_JOBS")),
                  "model": value("META_MODEL") or "muse-spark-1.3"},
     }
 
 
 def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str | None = None) -> None:
+    cloud = bool(os.getenv("FACTORY_CLOUD_JOBS"))
     busy = Lock()
     jobs_lock = Lock()
     jobs = {}
@@ -88,6 +97,11 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
             return read_recorded(["results/demo/meta-sequential-demo.json", "runs/meta-sequential-demo.json"])
         if source_id == "recorded-note":
             return read_recorded(["results/notes/verified-note-workflow.json"])["branch"]
+        if cloud:
+            from .cloud import get
+            source = get(source_id)
+            if source and source["status"] == "completed":
+                return source["result"]
         with jobs_lock:
             source = jobs.get(source_id)
             if not source or source["status"] != "completed":
@@ -180,7 +194,7 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
                 return
             path = urlsplit(self.path).path
             if path == "/api/status":
-                self.send(200, {"providers": provider_status(), "synthetic": True, "budget": local_budget_status()})
+                self.send(200, {"providers": provider_status(), "synthetic": True, "capabilities":{"maintenance_notes":not cloud}, "budget": local_budget_status()})
             elif path == "/api/recorded-episode":
                 try:
                     result = read_recorded(["results/demo/meta-sequential-demo.json", "runs/meta-sequential-demo.json"])
@@ -200,6 +214,11 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
                     self.send(404, {"error": "No verified recorded note workflow is available yet."})
             elif path.startswith("/api/jobs/"):
                 job_id = path.removeprefix("/api/jobs/")
+                if cloud:
+                    from .cloud import get
+                    snapshot = get(job_id)
+                    self.send(200 if snapshot else 404, snapshot or {"error":"Unknown execution job"})
+                    return
                 with jobs_lock:
                     job = jobs.get(job_id)
                     snapshot = {**job, "progress": list(job["progress"]), "frames": list(job["frames"])} if job else None
@@ -236,6 +255,19 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
                     raise ValueError("Repair time must follow outage time")
             except ValueError:
                 self.send(400, {"error": "Check machine, provider, and times. Repair must follow the outage; use whole minutes."})
+                return
+            if cloud and path == "/api/episode":
+                from .cloud import start
+                try:
+                    job_id = start("episode", {"policy":request.policy,"scenario":load_demo().model_dump()})
+                    self.send(202,{"job_id":job_id,"status":"running"})
+                except ValueError as error:
+                    self.send(409,{"error":str(error)})
+                except Exception:
+                    self.send(503,{"error":"Cloud job dispatch is unavailable; no inference retry was made."})
+                return
+            if cloud and path in {"/api/agent", "/api/interpret-note"}:
+                self.send(422,{"error":"Hosted live inference currently supports Meta episodes. Use the recorded note workflow or run note interpretation locally."})
                 return
             if not busy.acquire(blocking=False):
                 self.send(409, {"error": "An experiment is already running. Wait for it to finish."})

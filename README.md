@@ -8,7 +8,7 @@ Built by Ayushi Chadha for the Meta Global AI Developer Hackathon 2026, **Indie 
 
 [![Offline tests](https://github.com/Ayushichadha/meta-autonomous-lab/actions/workflows/tests.yml/badge.svg)](https://github.com/Ayushichadha/meta-autonomous-lab/actions/workflows/tests.yml)
 
-[Public recorded demo](https://ayushichadha.github.io/meta-autonomous-lab/) · [Validation: 56 passing tests and fresh examples](docs/VALIDATION_2026-11-03.md)
+[Live hosted application](https://ayushichadha--factory-recovery-lab-web.us-east.modal.run/) · [Recorded replay](https://ayushichadha.github.io/meta-autonomous-lab/) · [Validation: 56 passing tests and fresh examples](docs/VALIDATION_2026-11-03.md)
 
 ## What works
 
@@ -155,4 +155,4 @@ The factory application, sequential runner, scheduling integration, independent 
 
 Synthetic four-machine instances with known processing durations and exogenous failures are a narrow testbed. There is no industrial validation, sensor synchronization, ERP integration, or physical machine actuation. Stress trials are representative, not probabilistic guarantees. Three live evaluation cases are insufficient to establish general model reliability or superiority. Model-generated rationale is displayed separately from tool-calculated evidence because its narrative can overstate a comparison.
 
-The demo flow is in [docs/DEMO.md](docs/DEMO.md). A static public replay is built by `scripts/build_public_demo.py` and deployed through GitHub Pages. It contains only allowlisted synthetic recordings and evaluation data; new simulation and inference require the local application. A recorded submission video remains packaging work.
+The demo flow is in [docs/DEMO.md](docs/DEMO.md). The live Python backend runs on Modal CPU infrastructure with bounded web/worker containers, detached execution jobs, scale-to-zero, server-side credentials, and a persistent inference guard. Deployment instructions are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). A static public replay is built by `scripts/build_public_demo.py` and deployed through GitHub Pages. It contains only allowlisted synthetic recordings and evaluation data; new simulation and inference require the local application. A recorded submission video remains packaging work.

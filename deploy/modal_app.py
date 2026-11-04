@@ -13,24 +13,31 @@ image = (modal.Image.debian_slim(python_version='3.12')
 
 
 @app.function(image=image, cpu=1, memory=1024, max_containers=1,
-              scaledown_window=600, timeout=900, volumes={'/state':volume},
+              scaledown_window=60, timeout=900, volumes={'/state':volume},
               secrets=[modal.Secret.from_name('factory-meta')])
+def execute(job_id, kind, payload):
+    import os
+    import sys
+    os.chdir('/app'); sys.path.insert(0,'/app/src')
+    volume.reload()
+    Path('/state/runs').mkdir(exist_ok=True)
+    if not Path('/app/runs').exists():
+        Path('/app/runs').symlink_to('/state/runs',target_is_directory=True)
+    os.environ['FACTORY_MODAL_VOLUME']='factory-recovery-state'
+    from factory_lab.cloud import execute as run
+    run(job_id,kind,payload)
+
+
+@app.function(image=image, cpu=.25, memory=512, max_containers=1,
+              scaledown_window=60, timeout=900)
 @modal.concurrent(max_inputs=20)
 @modal.web_server(8000, startup_timeout=60)
 def web():
     import os
     import subprocess
-    # Runs and the $1 admission ledger survive container restarts. Reservations
-    # commit before inference; failure to persist prevents the request.
-    Path('/state/runs').mkdir(exist_ok=True)
-    if not Path('/app/runs').exists():
-        Path('/app/runs').symlink_to('/state/runs', target_is_directory=True)
-    env = {**os.environ, 'PYTHONPATH':'/app/src',
-           'FACTORY_MODAL_VOLUME':'factory-recovery-state'}
     from urllib.parse import urlsplit
-    host = urlsplit(modal.Function.from_name('factory-recovery-lab', 'web').get_web_url()).netloc
-    env['FACTORY_PUBLIC_HOST'] = host
-    code = ('from factory_lab.server import run_dashboard; '
-            'import os; run_dashboard(8000, bind="0.0.0.0", '
-            'public_host=os.environ["FACTORY_PUBLIC_HOST"])')
-    subprocess.Popen(['python','-c',code], cwd='/app', env=env)
+    host=urlsplit(modal.Function.from_name('factory-recovery-lab','web').get_web_url()).netloc
+    env={**os.environ,'PYTHONPATH':'/app/src','FACTORY_CLOUD_JOBS':'1','FACTORY_PUBLIC_HOST':host}
+    code=('from factory_lab.server import run_dashboard; import os; '
+          'run_dashboard(8000,bind="0.0.0.0",public_host=os.environ["FACTORY_PUBLIC_HOST"])')
+    subprocess.Popen(['python','-c',code],cwd='/app',env=env)
