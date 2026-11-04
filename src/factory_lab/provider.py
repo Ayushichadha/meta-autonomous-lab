@@ -68,7 +68,21 @@ class ModelClient:
             raise ProviderError("Model request limit reached; no request sent")
         if not 1 <= max_tokens <= 2048:
             raise ValueError("Output cap must be between 1 and 2048 tokens")
-        input_bytes = len(json.dumps({"messages": messages, "tools": tools}, ensure_ascii=True).encode())
+        # Image bytes are not text tokens. Bound and validate one image separately,
+        # then reserve a conservative visual-token allowance in addition to text.
+        accounting_messages = json.loads(json.dumps(messages))
+        image_count = 0
+        for message in accounting_messages:
+            if isinstance(message.get("content"), list):
+                for part in message["content"]:
+                    if part.get("type") == "image_url":
+                        from .vision import validate_image
+                        validate_image(part.get("image_url", {}).get("url", ""))
+                        image_count += 1
+                        part["image_url"]["url"] = "[bounded image]"
+        if image_count > 1:
+            raise ProviderError("Only one bounded image is supported per request")
+        input_bytes = len(json.dumps({"messages": accounting_messages, "tools": tools}, ensure_ascii=True).encode())
         if input_bytes > 60000:
             raise ProviderError("Prompt exceeded the local size limit; no request sent")
         request_id = None
@@ -76,7 +90,7 @@ class ModelClient:
             input_rate, _, output_rate = rates(self.model)
             # Byte count plus overhead is deliberately conservative; this is an
             # application estimate, not a token-counting or billing guarantee.
-            reserve = ((input_bytes + 4096) * input_rate + max_tokens * output_rate) / 1e6
+            reserve = ((input_bytes + 4096 + image_count * 32768) * input_rate + max_tokens * output_rate) / 1e6
             request_id = self.ledger.reserve(self.model, reserve)
         self.requests += 1
         start = perf_counter()

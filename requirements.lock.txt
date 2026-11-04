@@ -1,4 +1,5 @@
-# Resolved local development environment, Python 3.13 / macOS arm64.
+# Resolved core development environment, Python 3.13 / macOS arm64.
+# Updated November 4 to include bounded-image validation. Modal SDK is a deployment extra.
 # For platform-specific wheels, install with pip from these exact versions.
 Pygments==2.21.0
 absl-py==2.5.1
@@ -27,3 +28,4 @@ six==1.17.0
 typing-inspection==0.4.4
 typing_extensions==4.16.0
 tzdata==2026.6
+Pillow==12.3.0

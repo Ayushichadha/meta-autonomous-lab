@@ -7,7 +7,7 @@ app = modal.App('factory-recovery-lab')
 volume = modal.Volume.from_name('factory-recovery-state', create_if_missing=True)
 image = (modal.Image.debian_slim(python_version='3.12')
          .pip_install('ortools>=9.12,<10', 'simpy>=4.1,<5', 'pydantic>=2.10,<3',
-                      'httpx>=0.28,<1', 'python-dotenv>=1,<2', 'modal>=1,<2')
+                      'httpx>=0.28,<1', 'python-dotenv>=1,<2', 'modal>=1,<2', 'Pillow>=11,<13')
          .add_local_dir(ROOT/'src', '/app/src')
          .add_local_dir(ROOT/'results', '/app/results'))
 

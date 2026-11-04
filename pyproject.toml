@@ -13,10 +13,12 @@ dependencies = [
   "pydantic>=2.10,<3",
   "httpx>=0.28,<1",
   "python-dotenv>=1,<2",
+  "Pillow>=11,<13",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10"]
+deploy = ["modal>=1,<2"]
 
 [project.scripts]
 factory-lab = "factory_lab.cli:main"

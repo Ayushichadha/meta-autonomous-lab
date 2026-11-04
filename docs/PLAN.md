@@ -1,4 +1,4 @@
-# Implementation status — November 1, 2026
+# Implementation status — November 4, 2026
 
 Factory recovery is the selected scope for the Indie Developer / Push the Frontier entry. Preserve the working architecture. No satellite, drone, hardware, ERP, or unrelated extensions are planned for this submission.
 
@@ -10,12 +10,13 @@ Factory recovery is the selected scope for the Indie Developer / Push the Fronti
 4. **Autonomous supervision:** state inspection, explicit experiment hypotheses, bounded candidate tools, mandatory baseline, compact evidence, selection-only final turn, complete normalized traces, and explicit fallback failures.
 5. **Comparison:** preserve, always replan, fixed interval, strong conventional selector, and Meta. Two frozen evaluation versions, each with 20 conventional cases and three predeclared live Meta cases. Version 1 failures retained; version 2 completed without fallback. No superiority claim.
 6. **Operations console:** factory observation replay, actual/forecast Gantt, operation register and queues, hypotheses, tool trace, evidence-calculated decisions, model rationale labelled separately, final outcomes, paired evaluation, failures, JSON export, live job progress, and recorded-run mode. Original single-event interface retained at `/single`.
-7. **Reproducibility:** 41 passing offline tests, pinned local dependency snapshot, source/configuration hashes, all normalized compressed run artifacts, README, methodology, and a truthful three-minute demo script.
+7. **Multimodal interaction:** Muse Spark image reading, review-required editable transcription, typed note validation and detached recovery branches; actual two-request visual workflow verified. Play/pause/restart/speed controls and actual worker-event progress are available.
+8. **Reproducibility:** 68 passing offline tests, pinned local dependency snapshot, source/configuration hashes, all normalized compressed run artifacts, README, methodology, and a truthful three-minute demo script.
 
 ## Remaining verification and packaging
 
 - Browser replay, candidate inspection, a fresh conventional execution, and narrow-screen layout have been checked. Verify latest CI before handoff.
-- Public hosting: not deployed; local execution is working. Choose a suitable Python backend host when packaging the live product.
+- Public hosting: live Modal CPU backend verified, including detached Meta jobs and visual maintenance recovery; GitHub Pages remains a recorded replay. No new payment method added.
 - Submission video: script prepared; actual recording and public video link remain to be produced.
 - Verify submission fields, accessible code/video/demo links, and newly built contributions before submitting.
 

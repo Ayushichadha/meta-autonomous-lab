@@ -8,12 +8,13 @@
   const colors = ['#30755a','#597a8b','#997447','#708953','#7c6c91','#398687','#a16f76','#94915c'];
   let episode = null, frameIndex = 0, preview = null, running = false, metaReady = false, notesReady = true;
   let sourceId = 'recorded', noteResult = null, noteId = null, noteContextKey = null;
+  let playTimer=null, imageData=null, visualNeedsReview=false, imageRead=false;
   const status = (text,error=false) => { $('console-status').textContent=text; $('console-status').classList.toggle('error',error); };
   const fmt = value => Number.isFinite(value) ? Number(value.toFixed(2)).toLocaleString() : '—';
   async function request(path, options) { if(publicReplay&&options?.method&&options.method!=='GET')throw Error('Public replay is read-only. Run locally for fresh simulation and inference.'); const target=publicReplay?publicAssets[path]:path; if(!target)throw Error('This action is available in the local application.'); const response=await fetch(target,options);const data=await response.json();if(!response.ok)throw Error(data.error||'Request failed');return data; }
-  function busy(value) {running=value;document.body.classList.toggle('running',value);$('start-episode').disabled=value||publicReplay;$('episode-policy').disabled=value||publicReplay;$('recorded').disabled=value; $('replay-note').disabled=value; updateNoteButtons();}
+  function busy(value) {if(value)stopPlayback();running=value;document.body.classList.toggle('running',value);$('start-episode').disabled=value||publicReplay;$('episode-policy').disabled=value||publicReplay;$('recorded').disabled=value; $('replay-note').disabled=value; updateNoteButtons();}
   async function connection() {try {const data=await request('/api/status');metaReady=!publicReplay&&data.providers.meta.configured; notesReady=data.capabilities?.maintenance_notes!==false; updateNoteButtons();$('credit-status').textContent=publicReplay?'PUBLIC REPLAY · recorded real Meta runs. No key, account access, or inference charges. Run locally for new executions.':`Meta key ${metaReady?'configured':'not configured'} · local $1 guard${data.budget?` · $${data.budget.reserved_or_estimated_usd.toFixed(3)} recorded/reserved`:''}. Not the account balance.`;}catch(error){$('credit-status').textContent=error.message;}}
-  async function recorded() {try {const data=await request('/api/recorded-episode');episode=data.episode;sourceId='recorded';frameIndex=Math.max(0,episode.frames.findIndex(f=>f.time===25));preview=null;render('RECORDED META EXECUTION');status('Loaded a recorded real Meta run. Replaying it spends no API credits.');}catch(error){status(error.message,true);}}
+  async function recorded() {stopPlayback();try {const data=await request('/api/recorded-episode');episode=data.episode;sourceId='recorded';$('playback-status').textContent='Playback advances recorded observations; no new inference.';setProgress('observe','Recorded run loaded. Use Play shift to inspect observations.');frameIndex=Math.max(0,episode.frames.findIndex(f=>f.time===25));preview=null;render('RECORDED META EXECUTION');status('Loaded a recorded real Meta run. Replaying it spends no API credits.');}catch(error){status(error.message,true);}}
   async function execute() {
     if(running)return;const policy=$('episode-policy').value;
     if(policy==='meta'&&!metaReady){status('Add your Meta key locally before starting a live model episode.',true);return;}
@@ -30,19 +31,19 @@
           sourceId=job.job_id;episode={run_id:job.job_id,scenario:state.scenario,policy:state.policy,frames:state.frames,realized_metrics:null,failures:[],limitations:['Live execution in progress; final results are not available yet.']};
           frameIndex=episode.frames.length-1;preview=null;render('LIVE EXECUTION · IN PROGRESS');
         }
-        if(state.progress.length){const latest=state.progress.at(-1);status(`${latest.time!==undefined?`Minute ${latest.time} · `:''}${latest.stage.replaceAll('_',' ')}${latest.tool?` · ${latest.tool}`:''}${latest.request?` ${latest.request}`:''}`);}
-        if(state.status==='completed'){episode=state.result;sourceId=job.job_id;frameIndex=episode.frames.length-1;preview=null;render('NEW EXECUTION · COMPLETED');status(`${episode.status.replaceAll('_',' ')} · ${episode.realized_metrics?.model_calls||0} model requests · ${episode.failures.length} failures/fallbacks.`);break;}
+        if(state.progress.length){const latest=state.progress.at(-1);reportProgress(latest);status(`${latest.time!==undefined?`Minute ${latest.time} · `:''}${latest.stage.replaceAll('_',' ')}${latest.tool?` · ${latest.tool}`:''}${latest.request?` ${latest.request}`:''}`);}
+        if(state.status==='completed'){setProgress('complete','Execution complete. Inspect outcomes or play the shift.');episode=state.result;sourceId=job.job_id;frameIndex=episode.frames.length-1;preview=null;render('NEW EXECUTION · COMPLETED');status(`${episode.status.replaceAll('_',' ')} · ${episode.realized_metrics?.model_calls||0} model requests · ${episode.failures.length} failures/fallbacks.`);break;}
         if(state.status==='failed')throw Error(state.error);
         await new Promise(resolve=>setTimeout(resolve,500));
       }
   }
   function render(mode) {
-    const f=episode.frames[frameIndex]; updateNoteButtons(); $('note-context').textContent=`Grounded at minute ${f.time} · source ${sourceId} · current outages: ${Object.entries(f.state.available_at).map(([m,t])=>`${m} expected at ${t}`).join(', ')||'none'}.`; $('frame-slider').max=episode.frames.length-1;$('frame-slider').value=frameIndex;$('frame-slider').disabled=false;$('frame-time').textContent=f.time;$('execution-mode').textContent=mode||$('execution-mode').textContent;$('export-episode').disabled=false;
+    const f=episode.frames[frameIndex]; updateNoteButtons();$('play-shift').disabled=running||episode.frames.length<2; $('note-context').textContent=`Grounded at minute ${f.time} · source ${sourceId} · current outages: ${Object.entries(f.state.available_at).map(([m,t])=>`${m} expected at ${t}`).join(', ')||'none'}.`; $('frame-slider').max=episode.frames.length-1;$('frame-slider').value=frameIndex;$('frame-slider').disabled=false;$('frame-time').textContent=f.time;$('execution-mode').textContent=mode||$('execution-mode').textContent;$('export-episode').disabled=false;
     const counts={active:0,paused:0,queued:0,completed:0,blocked:0};for(const op of f.factory.operations)if(op.status in counts)counts[op.status]++;
     $('state-counts').innerHTML=Object.entries(counts).map(([k,v])=>`<span><b>${v}</b>${k}</span>`).join('');
     $('event-buttons').innerHTML=episode.frames.map((frame,i)=>frame.events.length||i===0||i===episode.frames.length-1?`<button class="event-button" data-frame="${i}" aria-pressed="${i===frameIndex}">${frame.time}m · ${i===0?(frame.time===0?'Shift start':'Branch start'):frame.events.length?esc(frame.events.map(e=>e.kind.replaceAll('_',' ')).join(' + ')):'Completed execution'}</button>`:'').join('');
-    for(const button of document.querySelectorAll('[data-frame]'))button.onclick=()=>{frameIndex=Number(button.dataset.frame);preview=null;render();};
-    $('factory-machines').innerHTML=f.factory.machines.map(m=>`<div class="machine ${m.status==='down'?'down':''}"><div class="machine-name">${esc(m.machine)}<i></i></div><div class="machine-status">${esc(m.status)}</div><p>${m.current_operation?esc(m.current_operation):'No active operation'}</p><p>${m.status==='down'?`Forecast available: minute ${m.forecast_available_at}`:'Available to the dispatcher'}</p><p class="queue">QUEUE · ${m.queue.length?esc(m.queue.join(' → ')):'empty'}</p></div>`).join('');
+    for(const button of document.querySelectorAll('[data-frame]'))button.onclick=()=>{stopPlayback();frameIndex=Number(button.dataset.frame);preview=null;render();};
+    $('factory-machines').innerHTML=f.factory.machines.map(m=>`<div class="machine ${m.status==='running'?'running':''} ${m.status==='down'?'down':''}"><div class="machine-name">${esc(m.machine)}<i></i></div><div class="machine-status">${esc(m.status)}</div><p>${m.current_operation?esc(m.current_operation):'No active operation'}</p><p>${m.status==='down'?`Forecast available: minute ${m.forecast_available_at}`:'Available to the dispatcher'}</p><p class="queue">QUEUE · ${m.queue.length?esc(m.queue.join(' → ')):'empty'}</p></div>`).join('');
     $('operation-register').innerHTML=f.factory.operations.map(o=>`<tr><td>${esc(o.operation)}</td><td>${esc(o.machine)}</td><td><span class="state-tag ${o.status}">${esc(o.status)}</span></td><td>${o.worked_minutes} min</td><td>${o.remaining_minutes} min</td></tr>`).join('');
     const decision=f.decision;
     const last=episode.frames.slice(0,frameIndex+1).findLast(frame=>frame.decision);
@@ -95,8 +96,8 @@
   }
   function currentNoteKey() { return `${sourceId}:${frameIndex}:${$('maintenance-note').value.trim()}`; }
   function updateNoteButtons() {
-    const valid=Boolean(noteId&&noteResult?.interpretation.status==='validated'&&noteResult.interpretation.events.length&&noteContextKey===currentNoteKey());
-    $('interpret-note').disabled=running||publicReplay||!metaReady||!notesReady||!episode; $('interpret-note').title=notesReady?'':'Live note interpretation is available locally; hosted replay remains available.'; $('start-episode').disabled=running||publicReplay; $('episode-policy').disabled=running||publicReplay;
+    const valid=Boolean(noteId&&noteResult?.interpretation.status==='validated'&&noteResult.interpretation.events.length&&noteContextKey===currentNoteKey()&&(!visualNeedsReview||$('visual-reviewed').checked));
+    $('interpret-note').disabled=running||publicReplay||!metaReady||!notesReady||!episode||(visualNeedsReview&&!$('visual-reviewed').checked); $('read-image').disabled=running||publicReplay||!metaReady||!imageData||imageRead; $('visual-reviewed').disabled=running; $('sample-image').disabled=running; $('maintenance-image').disabled=running; $('play-shift').disabled=running||!episode; $('interpret-note').title=notesReady?'':'Live note interpretation is available locally; hosted replay remains available.'; $('start-episode').disabled=running||publicReplay; $('episode-policy').disabled=running||publicReplay;
     $('apply-note').disabled=running||publicReplay||!valid;
     $('apply-note-meta').disabled=running||publicReplay||!valid||!metaReady;
   }
@@ -108,12 +109,13 @@
     updateNoteButtons();
   }
   async function interpretOperatorNote() {
-    if(running||!episode)return;
+    if(running||!episode||(visualNeedsReview&&!$('visual-reviewed').checked))return;
     const text=$('maintenance-note').value.trim();if(!text){status('Enter a maintenance note first.',true);return;}
     const context=currentNoteKey();busy(true);status('Meta is extracting claims. Independent grounding and state checks follow; no update is applied yet.');
     try{
-      const result=await request('/api/interpret-note',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({note:text,source_id:sourceId,frame_index:frameIndex,provider:'meta'})});
-      noteResult=result;noteId=result.interpretation_id;noteContextKey=context;showNote(result);
+      let result=await request('/api/interpret-note',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({note:text,source_id:sourceId,frame_index:frameIndex,provider:'meta'})});
+      if(result.job_id)result=await analysisResult(result);
+      noteResult=result;noteId=result.interpretation_id;noteContextKey=context;showNote(result);setProgress('decide',result.interpretation.status==='validated'?'Checked report ready. Apply explicitly to create a recovery branch.':'Clarify or correct the report before applying it.');
       status(`${result.interpretation.status.replaceAll('_',' ')} · ${result.interpretation.events.length} state-changing events · ${result.cache_hit?'cached, no new inference':'one Meta interpretation request'}.`);
     }catch(error){status(error.message,true);}finally{busy(false);connection();}
   }
@@ -124,14 +126,60 @@
     catch(error){status(error.message,true);}finally{busy(false);connection();}
   }
   async function replayNote() {
-    if(running)return;
+    if(running)return;stopPlayback();visualNeedsReview=false;$('visual-review-label').hidden=true;
     try{const data=await request('/api/recorded-note');episode=data.branch;sourceId='recorded-note';frameIndex=Math.max(0,episode.frames.findIndex(f=>f.time===data.interpretation.observed_at&&f.events.length));preview=null;noteId=null;noteResult={interpretation:data.interpretation};$('maintenance-note').value=data.interpretation.note;render('RECORDED NOTE BRANCH');showNote(noteResult,true);status('Loaded the recorded real note-to-recovery workflow. No new inference or simulation was run.');}
     catch(error){status(error.message,true);}
   }
   $('interpret-note').onclick=interpretOperatorNote;$('apply-note').onclick=()=>applyNote('solver_selection');$('apply-note-meta').onclick=()=>applyNote('meta');$('replay-note').onclick=replayNote;
-  $('maintenance-note').oninput=()=>{noteId=null;noteResult=null;updateNoteButtons();$('note-result').className='note-result';$('note-result').textContent='Note changed. Interpret and validate before applying any update.';};
+  $('maintenance-note').oninput=()=>{if(visualNeedsReview)$('visual-reviewed').checked=false;noteId=null;noteResult=null;updateNoteButtons();$('note-result').className='note-result';$('note-result').textContent='Note changed. Interpret and validate before applying any update.';};
   for(const button of document.querySelectorAll('[data-note-example]'))button.onclick=()=>{$('maintenance-note').value=button.dataset.noteExample;$('maintenance-note').dispatchEvent(new Event('input'));};
-  $('frame-slider').oninput=()=>{frameIndex=Number($('frame-slider').value);preview=null;render();};$('start-episode').onclick=execute;$('recorded').onclick=recorded;$('refresh-evaluation').onclick=evaluation;
+  $('frame-slider').oninput=()=>{stopPlayback();frameIndex=Number($('frame-slider').value);preview=null;render();};$('start-episode').onclick=execute;$('recorded').onclick=recorded;$('refresh-evaluation').onclick=evaluation;
   $('export-episode').onclick=()=>{if(!episode)return;const url=URL.createObjectURL(new Blob([JSON.stringify(episode,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='factory-sequential-episode.json';a.click();URL.revokeObjectURL(url);};
+
+  function setProgress(stage, detail) {
+    for(const item of document.querySelectorAll('[data-stage]'))item.classList.toggle('active',item.dataset.stage===stage);
+    $('agent-progress-detail').textContent=detail;
+  }
+  function reportProgress(item) {
+    const stage=item.stage||'';
+    const phase=/selected|select_plan/.test(stage+' '+(item.tool||''))?'decide':/experiment|tool_|model_request/.test(stage)?'test':'observe';
+    const labels={reading_image:'Meta is reading visible image evidence. No factory update has been applied.',validating_note:'Meta is extracting claims; independent checks follow.',model_request:'Meta is reasoning from the current observation and tool evidence.',tool_started:'Running a bounded experiment or inspection tool.',tool_completed:'Tool evidence returned to the supervisor.',plan_selected:'A tested plan has been selected for independent validation.'};
+    setProgress(phase,`${item.time!==undefined?'Minute '+item.time+' · ':''}${labels[stage]||stage.replaceAll('_',' ')}${item.tool?' · '+item.tool:''}`);
+  }
+  async function analysisResult(job) {
+    while(true){const record=await request('/api/jobs/'+job.job_id);
+      if(record.status==='completed')return record.result;
+      if(record.status==='failed')throw Error(record.error||'Analysis failed; no update applied.');
+      if(record.progress.length)reportProgress(record.progress.at(-1));
+      await new Promise(resolve=>setTimeout(resolve,900));
+    }
+  }
+  function stopPlayback(){if(playTimer!==null)clearInterval(playTimer);playTimer=null;document.body.classList.remove('playing');$('play-shift').textContent='▶ Play shift';$('play-shift').setAttribute('aria-pressed','false');}
+  function playShift(){if(running||!episode)return;if(playTimer!==null){stopPlayback();return;}
+    if(frameIndex>=episode.frames.length-1)frameIndex=0;
+    document.body.classList.add('playing');$('play-shift').textContent='Ⅱ Pause';$('play-shift').setAttribute('aria-pressed','true');render();
+    playTimer=setInterval(()=>{if(frameIndex>=episode.frames.length-1){stopPlayback();$('playback-status').textContent='Shift replay complete. No new inference was used.';return;}
+      frameIndex++;preview=null;render();const f=episode.frames[frameIndex];$('playback-status').textContent=f.events.length?'Observed: '+f.events.map(e=>e.machine+' · '+e.kind.replaceAll('_',' ')).join('; '):'Minute '+f.time+' · production progress';
+    },Number($('playback-speed').value));
+  }
+  function chooseImage(data,label){imageData=data;imageRead=false;visualNeedsReview=false;$('visual-reviewed').checked=false;$('visual-review-label').hidden=true;$('image-preview').src=data;$('image-preview').hidden=false;$('visual-result').textContent='';$('image-status').textContent=label+' · ready to send only when you click Read image.';updateNoteButtons();}
+  async function uploadImage(file){if(!file)return;if(!['image/png','image/jpeg'].includes(file.type)||file.size>5*1024*1024)throw Error('Choose a PNG/JPEG smaller than 5 MB.');
+    const bitmap=await createImageBitmap(file);const scale=Math.min(1,1400/Math.max(bitmap.width,bitmap.height));const canvas=document.createElement('canvas');canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();
+    const data=canvas.toDataURL('image/jpeg',.82);if(data.length>690000)throw Error('Image remains too large. Crop to the maintenance text and upload again.');chooseImage(data,file.name+' · resized, metadata removed');
+  }
+  async function sampleImage(){if(running)return;await recorded();frameIndex=episode.frames.findIndex(f=>f.time===55);preview=null;render();
+    const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=650;const c=canvas.getContext('2d');c.fillStyle='#e5ece4';c.fillRect(0,0,1200,650);c.fillStyle='#fcfcf6';c.fillRect(35,35,1130,580);c.fillStyle='#1e4033';c.font='bold 26px sans-serif';c.fillText('SYNTHETIC DEMO · NOT REAL FACTORY DATA',75,95);c.font='bold 42px sans-serif';c.fillText('MAINTENANCE UPDATE',75,180);c.font='29px sans-serif';c.fillText('CNC-A repair delayed by another 40 minutes.',75,290);c.fillText('INSPECT remains available.',75,365);c.font='24px sans-serif';c.fillText('Observed at shift minute 55',75,510);chooseImage(canvas.toDataURL('image/png'),'Synthetic maintenance board · observation set to minute 55');
+  }
+  async function readImage(){if(running||!imageData||imageRead||publicReplay)return;const data=imageData;busy(true);setProgress('observe','Sending one bounded image to Muse Spark.');status('Reading visual evidence. No update will be applied.');
+    try{let result=await request('/api/interpret-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:data,provider:'meta'})});if(result.job_id)result=await analysisResult(result);
+      const report=result.visual_report;imageRead=true;visualNeedsReview=true;$('visual-reviewed').checked=false;$('visual-review-label').hidden=false;$('maintenance-note').value=report.transcription;noteId=null;noteResult=null;
+      $('visual-result').innerHTML='<strong>Model-read evidence · review required</strong><p>'+esc(report.observations.join(' '))+'</p>'+report.uncertainties.map(q=>'<p>Uncertainty: '+esc(q)+'</p>').join('')+'<p>Image reading cost: '+(result.cache_hit?'cached, no new inference':Number.isFinite(result.estimated_cost_usd)?'$'+result.estimated_cost_usd.toFixed(4):'unverified')+'. No factory state changed.</p>';
+      $('image-status').textContent='Read complete. Compare the editable transcription with the image, correct it, then confirm review.';$('note-result').textContent='Visual evidence is not yet a validated operator update.';setProgress('observe','Review the transcription before validating a maintenance update.');status('Image read complete. Review and confirm the transcription to continue.');
+    }catch(error){status(error.message,true);}finally{busy(false);connection();}
+  }
+  $('maintenance-image').onchange=async()=>{try{await uploadImage($('maintenance-image').files[0]);}catch(error){status(error.message,true);}};
+  $('sample-image').onclick=sampleImage;$('read-image').onclick=readImage;$('visual-reviewed').onchange=updateNoteButtons;
+  $('play-shift').onclick=playShift;$('restart-shift').onclick=()=>{stopPlayback();if(episode){frameIndex=0;preview=null;render();}};$('playback-speed').onchange=()=>{if(playTimer!==null){stopPlayback();playShift();}};
+
   connection();recorded();evaluation();
 })();

@@ -38,6 +38,11 @@ class NoteRequest(Model):
     provider: Literal["meta"] = "meta"
 
 
+class ImageRequest(Model):
+    image: str = Field(min_length=1, max_length=700000)
+    provider: Literal["meta"] = "meta"
+
+
 class NoteBranchRequest(Model):
     interpretation_id: str = Field(pattern=r"^[a-f0-9]{16}$")
     policy: Literal["solver_selection", "meta"] = "solver_selection"
@@ -100,7 +105,7 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
         if cloud:
             from .cloud import get
             source = get(source_id)
-            if source and source["status"] == "completed":
+            if source and source["status"] == "completed" and "frames" in source.get("result", {}):
                 return source["result"]
         with jobs_lock:
             source = jobs.get(source_id)
@@ -194,7 +199,7 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
                 return
             path = urlsplit(self.path).path
             if path == "/api/status":
-                self.send(200, {"providers": provider_status(), "synthetic": True, "capabilities":{"maintenance_notes":not cloud}, "budget": local_budget_status()})
+                self.send(200, {"providers": provider_status(), "synthetic": True, "capabilities":{"maintenance_notes":True,"vision":True}, "budget": local_budget_status()})
             elif path == "/api/recorded-episode":
                 try:
                     result = read_recorded(["results/demo/meta-sequential-demo.json", "runs/meta-sequential-demo.json"])
@@ -233,7 +238,7 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
             if not self.local_request():
                 return
             path = urlsplit(self.path).path
-            if path not in {"/api/compare", "/api/agent", "/api/episode", "/api/interpret-note", "/api/note-branch"}:
+            if path not in {"/api/compare", "/api/agent", "/api/episode", "/api/interpret-note", "/api/note-branch", "/api/interpret-image"}:
                 self.send(404, {"error": "Not found"})
                 return
             if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
@@ -241,11 +246,11 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
                 return
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if not 1 <= length <= 8192:
-                    raise ValueError("Request must be between 1 and 8192 bytes")
+                if not 1 <= length <= (710000 if path == "/api/interpret-image" else 8192):
+                    raise ValueError("Request exceeds the allowed size")
                 raw = self.rfile.read(length)
                 schema = {"/api/episode": EpisodeRequest, "/api/interpret-note": NoteRequest,
-                          "/api/note-branch": NoteBranchRequest}.get(path, RunRequest)
+                          "/api/note-branch": NoteBranchRequest, "/api/interpret-image": ImageRequest}.get(path, RunRequest)
                 request = schema.model_validate_json(raw)
                 if isinstance(request, RunRequest) and request.machine not in load_demo().machines:
                     raise ValueError("Unknown machine")
@@ -254,7 +259,51 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
                 if isinstance(request, RunRequest) and request.repair_at <= request.outage_at:
                     raise ValueError("Repair time must follow outage time")
             except ValueError:
-                self.send(400, {"error": "Check machine, provider, and times. Repair must follow the outage; use whole minutes."})
+                self.send(400, {"error": "Invalid or oversized request. Check the image, note, observation, or event times."})
+                return
+            if path == "/api/interpret-image":
+                try:
+                    from .vision import validate_image, interpret_image
+                    validate_image(request.image)
+                    if cloud:
+                        from .cloud import start
+                        job_id=start("image",{"image":request.image,"scenario":load_demo().model_dump(),"policy":"meta"})
+                        self.send(202,{"job_id":job_id})
+                    else:
+                        if not busy.acquire(blocking=False):
+                            self.send(409,{"error":"An experiment is already running."})
+                            return
+                        try:
+                            from .provider import ModelClient
+                            self.send(200,interpret_image(ModelClient('meta'),request.image))
+                        finally:
+                            busy.release()
+                except (ValueError,RuntimeError) as error:
+                    self.send(422,{"error":str(error).split("\n")[0][:250]})
+                except Exception:
+                    self.send(503,{"error":"Image analysis unavailable. No update was applied; no automatic retry."})
+                return
+            if cloud and path in {"/api/interpret-note", "/api/note-branch"}:
+                try:
+                    from .cloud import start, context
+                    if path == "/api/interpret-note":
+                        source=source_episode(request.source_id)
+                        from .branching import branch_context
+                        branch_context(source,request.frame_index)
+                        payload={"source":source,"frame_index":request.frame_index,"note":request.note,
+                                 "scenario":source["scenario"],"policy":"meta"}
+                        job_id=start("note",payload)
+                    else:
+                        stored=context(request.interpretation_id)
+                        record=stored.get("context") if stored and stored.get("status")=="completed" else None
+                        if not record or record["interpretation"]["status"]!="validated" or not record["interpretation"]["events"]:
+                            raise ValueError("Validate a state-changing note first. No update applied.")
+                        job_id=start("branch",{"record":record,"scenario":record["source"]["scenario"],"policy":request.policy})
+                    self.send(202,{"job_id":job_id})
+                except (ValueError,RuntimeError) as error:
+                    self.send(422,{"error":str(error).split("\n")[0][:250]})
+                except Exception:
+                    self.send(503,{"error":"Cloud dispatch unavailable. No automatic inference retry."})
                 return
             if cloud and path == "/api/episode":
                 from .cloud import start
@@ -266,7 +315,7 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
                 except Exception:
                     self.send(503,{"error":"Cloud job dispatch is unavailable; no inference retry was made."})
                 return
-            if cloud and path in {"/api/agent", "/api/interpret-note"}:
+            if cloud and path == "/api/agent":
                 self.send(422,{"error":"Hosted live inference currently supports Meta episodes. Use the recorded note workflow or run note interpretation locally."})
                 return
             if not busy.acquire(blocking=False):

@@ -18,7 +18,7 @@ def build(destination: Path) -> None:
     web = ROOT/"src/factory_lab/web"
     html = (web/"console.html").read_text().replace('<meta charset="utf-8">', '<meta charset="utf-8"><meta name="factory-demo-mode" content="public-replay">')
     html = html.replace('href="/console.css"','href="./console.css"').replace('src="/console.js"','src="./console.js"').replace('href="/"','href="./"')
-    html = html.replace('href="/single"','href="https://github.com/Ayushichadha/meta-autonomous-lab#run-the-console-without-spending-credits"').replace('Single-event lab','Run locally')
+    html = html.replace('href="/single"','href="https://ayushichadha--factory-recovery-lab-web.us-east.modal.run/"').replace('Single-event lab','Open live app')
     files = {"index.html":html.encode(), "console.css":(web/"console.css").read_bytes(),
              "console.js":(web/"console.js").read_bytes(), ".nojekyll":b""}
     files.update({name:(json.dumps(value)+"\n").encode() for name,value in values.items()})

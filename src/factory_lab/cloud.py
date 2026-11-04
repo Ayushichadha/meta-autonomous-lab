@@ -30,6 +30,11 @@ def start(kind, payload):
 
 
 def get(job_id):
+    record = store().get(job_id)
+    return {k:v for k,v in record.items() if k != 'context'} if record else None
+
+
+def context(job_id):
     return store().get(job_id)
 
 
@@ -45,7 +50,35 @@ def execute(job_id, kind, payload):
         record['frames'].append(item)
         jobs[job_id]=record
     try:
-        if kind=='branch':
+        if kind in {'image','note'}:
+            from .provider import ModelClient
+            progress({'stage':'reading_image' if kind=='image' else 'validating_note'})
+            import hashlib
+            import os
+            model=os.getenv('META_MODEL','muse-spark-1.3')
+            if kind=='image':
+                from .vision import interpret_image, validate_image
+                _,digest=validate_image(payload['image'])
+                cache_key={'schema':1,'kind':kind,'digest':digest,'model':model}
+            else:
+                from .branching import branch_context
+                from .notes import interpret_note
+                scenario,state,_=branch_context(payload['source'],payload['frame_index'])
+                cache_key={'schema':1,'kind':kind,'note':payload['note'],'scenario':scenario.model_dump(),'state':state.model_dump(),'model':model}
+            fingerprint=hashlib.sha256(json.dumps(cache_key,sort_keys=True).encode()).hexdigest()
+            cache=Path('runs/cache',fingerprint+'.json');cache.parent.mkdir(parents=True,exist_ok=True)
+            cached=cache.exists()
+            if cached:
+                analysis=json.loads(cache.read_text())
+            else:
+                analysis=interpret_image(ModelClient('meta'),payload['image']) if kind=='image' else interpret_note(ModelClient('meta'),payload['note'],scenario,state)
+                cache.write_text(json.dumps(analysis));cache.chmod(0o600)
+            if kind=='image':
+                result={**analysis,'cache_hit':cached}
+            else:
+                result={'interpretation_id':job_id,'interpretation':analysis,'cache_hit':cached}
+                record['context']={'source':payload['source'],'frame_index':payload['frame_index'],'interpretation':analysis}
+        elif kind=='branch':
             from .branching import run_note_branch
             source=payload['record']
             result=run_note_branch(source['source'],source['frame_index'],source['interpretation'],
@@ -56,7 +89,8 @@ def execute(job_id, kind, payload):
                 policy=payload['policy'], config=cfg, on_frame=frame,
                 supervisor=live_supervisor('meta',solve_seconds=cfg.solve_seconds,on_progress=progress)
                 if payload['policy']=='meta' else None)
-        result['run_id']=job_id
+        if kind not in {'image','note'}:
+            result['run_id']=job_id
         Path('runs').mkdir(exist_ok=True)
         Path('runs',job_id+'-episode.json').write_text(json.dumps(result))
         import modal

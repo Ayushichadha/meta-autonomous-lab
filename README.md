@@ -8,7 +8,7 @@ Built by Ayushi Chadha for the Meta Global AI Developer Hackathon 2026, **Indie 
 
 [![Offline tests](https://github.com/Ayushichadha/meta-autonomous-lab/actions/workflows/tests.yml/badge.svg)](https://github.com/Ayushichadha/meta-autonomous-lab/actions/workflows/tests.yml)
 
-[Live hosted application](https://ayushichadha--factory-recovery-lab-web.us-east.modal.run/) · [Recorded replay](https://ayushichadha.github.io/meta-autonomous-lab/) · [Validation: 56 passing tests and fresh examples](docs/VALIDATION_2026-11-03.md)
+[Live hosted application](https://ayushichadha--factory-recovery-lab-web.us-east.modal.run/) · [Recorded replay](https://ayushichadha.github.io/meta-autonomous-lab/) · [Validation: 68 passing tests and multimodal verification](docs/VALIDATION_2026-11-04.md)
 
 ## What works
 
@@ -18,6 +18,8 @@ Built by Ayushi Chadha for the Meta Global AI Developer Hackathon 2026, **Indie 
 - A real Muse Spark 1.3 tool-using supervisor, with experiment/request budgets and explicit failure fallback.
 - Independent validation of schedules, including downtime, overlap, progress, and immutable completed work.
 - An operations console with observation replay, actual/forecast Gantt segments, queues, hypotheses, tool traces, decisions, and evaluation results.
+- Muse Spark vision reads bounded maintenance images into editable, review-required transcriptions; validated reports feed recovery branches.
+- Play/pause/restart shift replay, adjustable speed, event highlights and actual worker-progress feedback.
 - Maintenance notes interpreted by Meta into quoted claims, independently checked and applied in a separate simulation branch. Missing or ambiguous estimates require clarification.
 - Frozen synthetic evaluation: 20 cases per version, four conventional policies, and three predeclared real-Meta cases per version. All outcomes and original failures are published.
 
@@ -42,6 +44,10 @@ PYTHONPATH=src python -m factory_lab.cli episode --policy solver_selection
 ```
 
 The latter writes `runs/episode.json` with observations, enacted schedules, candidate forecasts, realized outcomes, compute usage, and failures.
+
+## Image-to-recovery demonstration
+
+On the [live app](https://ayushichadha--factory-recovery-lab-web.us-east.modal.run/), choose **Load synthetic board**, then **Read image with Meta**. Review and correct the transcription, confirm it, and choose **Interpret & validate** before explicitly applying a recovery branch. Image reading and interpretation use credits; conventional recovery and shift playback do not. See [the complete workflow and limits](docs/MULTIMODAL.md).
 
 ## Maintenance-note recovery
 

@@ -50,4 +50,4 @@ Normalized simulation and model-tool records are public. Credentials, spending-l
 
 ## Limits
 
-Synthetic, small instances; no real telemetry or industrial validation; known processing durations; failures independent of policy; no material shortages, scrap/rework, workforce or complex setup modelling; limited discrete recovery actions; current-outage-only stress variation; small Meta coverage; model sampling and wall-time solver variability. Public hosting and submission-video production remain separate packaging work.
+Synthetic, small instances; no real telemetry or industrial validation; known processing durations; failures independent of policy; no material shortages, scrap/rework, workforce or complex setup modelling; limited discrete recovery actions; current-outage-only stress variation; small Meta coverage; model sampling and wall-time solver variability. The live backend is deployed separately from these frozen evaluations; submission-video production remains packaging work.
