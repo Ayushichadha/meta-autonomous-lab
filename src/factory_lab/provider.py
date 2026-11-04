@@ -8,7 +8,7 @@ from time import perf_counter
 import httpx
 from dotenv import load_dotenv
 
-from .budget import BudgetLedger, rates
+from .budget import BudgetLedger, rates, configured_limit
 
 
 class ProviderError(RuntimeError):
@@ -34,13 +34,13 @@ class ModelClient:
         self._key = key.strip()
         self.requests = 0
         self.cost_usd = 0.0
-        self.ledger = BudgetLedger() if provider == "meta" else None
+        self.ledger = BudgetLedger(limit_usd=configured_limit()) if provider == "meta" else None
 
-    def _request(self, method: str, path: str, payload=None) -> dict:
+    def _request(self, method: str, path: str, payload=None, *, files=None) -> dict:
         try:
             with httpx.Client(timeout=60.0, follow_redirects=False) as client:
                 response = client.request(method, self.base_url + path,
-                    headers={"Authorization": "Bearer " + self._key}, json=payload)
+                    headers={"Authorization": "Bearer " + self._key}, json=payload, files=files)
         except httpx.RequestError:
             raise ProviderError(f"{self.provider} network request failed; check connectivity and try again.") from None
         if response.status_code >= 300:
@@ -56,6 +56,33 @@ class ModelClient:
             return response.json()
         except ValueError:
             raise ProviderError("Provider returned a non-JSON response") from None
+
+    def transcribe_audio(self, data_url: str) -> dict:
+        from .voice import validate_audio
+        if self.provider != "meta" or self.ledger is None:
+            raise ProviderError("Maintenance dictation requires Meta API")
+        raw, duration, digest = validate_audio(data_url)
+        if self.requests >= 6:
+            raise ProviderError("Model request limit reached; no request sent")
+        model = "muse-voice-transcribe-1.0"
+        request_id = self.ledger.reserve(model, max(.00005, (int(duration)+2) * .18 / 3600))
+        self.requests += 1
+        started = perf_counter()
+        settings = {"model":model,"mode":"PUSH_TO_TALK","audioEncoding":"WAV",
+                    "languageBias":["English"],"keywords":["CNC-A","CNC-B","INSPECT","ASSEMBLY"]}
+        data = self._request("POST", "/asr/transcribe", files={
+            "request":(None,json.dumps(settings),"application/json"),
+            "audio":("maintenance.wav",raw,"audio/wav")})
+        transcript = data.get("transcript")
+        if not isinstance(transcript,str) or not transcript.strip() or len(transcript)>2000:
+            raise ProviderError("No usable bounded transcript returned; no update applied")
+        processed = data.get("audioDurationMs")
+        if not isinstance(processed,(float,int)) or not 0 <= processed <= duration*1000+1000:
+            processed = None
+        cost = self.ledger.settle(request_id,model,{"audioDurationMs":processed})
+        return {"transcription":transcript,"model":model,"review_required":True,"state_changed":False,
+                "audio_sha256":digest,"duration_seconds":duration,"processed_audio_ms":processed,
+                "estimated_cost_usd":cost,"seconds":perf_counter()-started}
 
     def models(self) -> list[str]:
         return [m["id"] for m in self._request("GET", "/models").get("data", []) if "id" in m]

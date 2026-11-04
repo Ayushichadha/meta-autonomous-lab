@@ -27,6 +27,7 @@ class RunRequest(Model):
 
 
 class EpisodeRequest(Model):
+    investigate_repair_risk: bool = False
     policy: Literal["preserve", "always_replan", "fixed_interval", "solver_selection", "meta"] = "solver_selection"
     provider: Literal["meta", "baseten"] = "meta"
 
@@ -43,6 +44,11 @@ class ImageRequest(Model):
     provider: Literal["meta"] = "meta"
 
 
+class AudioRequest(Model):
+    audio: str = Field(min_length=1, max_length=1400000)
+    provider: Literal["meta"] = "meta"
+
+
 class NoteBranchRequest(Model):
     interpretation_id: str = Field(pattern=r"^[a-f0-9]{16}$")
     policy: Literal["solver_selection", "meta"] = "solver_selection"
@@ -50,19 +56,20 @@ class NoteBranchRequest(Model):
 
 
 def local_budget_status() -> dict:
-    from .budget import BudgetLedger
-    ledger = BudgetLedger()
+    from .budget import BudgetLedger, configured_limit
+    limit = configured_limit()
+    ledger = BudgetLedger(limit_usd=limit)
     if os.getenv("FACTORY_CLOUD_JOBS"):
         import modal
         try:
             data = b"".join(modal.Volume.from_name("factory-recovery-state").read_file("/runs/meta-usage.jsonl"))
             latest = {r["request_id"]:r for r in map(json.loads,data.splitlines())}
-            return {"limit_usd":1.0,"reserved_or_estimated_usd":sum(r["charged_usd"] for r in latest.values())}
+            return {"limit_usd":limit,"reserved_or_estimated_usd":sum(r["charged_usd"] for r in latest.values())}
         except Exception:
-            return {"limit_usd":1.0,"reserved_or_estimated_usd":1.0,"note":"Usage unavailable; do not start inference."}
+            return {"limit_usd":limit,"reserved_or_estimated_usd":limit,"note":"Usage unavailable; do not start inference."}
     with ledger.locked() as (_, records):
         latest = {r["request_id"]: r for r in records}
-    return {"limit_usd": 1.0, "reserved_or_estimated_usd": sum(r["charged_usd"] for r in latest.values()),
+    return {"limit_usd": limit, "reserved_or_estimated_usd": sum(r["charged_usd"] for r in latest.values()),
             "note": "Local estimate/reservations, not the provider account balance."}
 
 
@@ -153,7 +160,8 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
         try:
             config = EpisodeConfig()
             callback = live_supervisor(request.provider, solve_seconds=config.solve_seconds,
-                on_progress=progress) if request.policy == "meta" else None
+                on_progress=progress,enable_stress_tests=request.investigate_repair_risk,
+                investigate_repair_risk=request.investigate_repair_risk) if request.policy == "meta" else None
             result = run_episode(load_demo(), demo_events(), policy=request.policy, config=config,
                 supervisor=callback, on_frame=frame_ready)
             result["run_id"] = job_id
@@ -180,7 +188,7 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
-            self.send_header("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
+            self.send_header("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; media-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'")
             self.end_headers()
             self.wfile.write(body)
 
@@ -199,7 +207,7 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
                 return
             path = urlsplit(self.path).path
             if path == "/api/status":
-                self.send(200, {"providers": provider_status(), "synthetic": True, "capabilities":{"maintenance_notes":True,"vision":True}, "budget": local_budget_status()})
+                self.send(200, {"providers": provider_status(), "synthetic": True, "capabilities":{"maintenance_notes":True,"vision":True,"voice":True}, "budget": local_budget_status()})
             elif path == "/api/recorded-episode":
                 try:
                     result = read_recorded(["results/demo/meta-sequential-demo.json", "runs/meta-sequential-demo.json"])
@@ -238,7 +246,7 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
             if not self.local_request():
                 return
             path = urlsplit(self.path).path
-            if path not in {"/api/compare", "/api/agent", "/api/episode", "/api/interpret-note", "/api/note-branch", "/api/interpret-image"}:
+            if path not in {"/api/compare", "/api/agent", "/api/episode", "/api/interpret-note", "/api/note-branch", "/api/interpret-image", "/api/transcribe-audio"}:
                 self.send(404, {"error": "Not found"})
                 return
             if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
@@ -246,11 +254,11 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
                 return
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if not 1 <= length <= (710000 if path == "/api/interpret-image" else 8192):
+                if not 1 <= length <= (1410000 if path == "/api/transcribe-audio" else 710000 if path == "/api/interpret-image" else 8192):
                     raise ValueError("Request exceeds the allowed size")
                 raw = self.rfile.read(length)
                 schema = {"/api/episode": EpisodeRequest, "/api/interpret-note": NoteRequest,
-                          "/api/note-branch": NoteBranchRequest, "/api/interpret-image": ImageRequest}.get(path, RunRequest)
+                          "/api/note-branch": NoteBranchRequest, "/api/interpret-image": ImageRequest, "/api/transcribe-audio": AudioRequest}.get(path, RunRequest)
                 request = schema.model_validate_json(raw)
                 if isinstance(request, RunRequest) and request.machine not in load_demo().machines:
                     raise ValueError("Unknown machine")
@@ -260,6 +268,28 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
                     raise ValueError("Repair time must follow outage time")
             except ValueError:
                 self.send(400, {"error": "Invalid or oversized request. Check the image, note, observation, or event times."})
+                return
+            if path == "/api/transcribe-audio":
+                try:
+                    from .voice import validate_audio
+                    validate_audio(request.audio)
+                    if cloud:
+                        from .cloud import start
+                        job_id=start("voice",{"audio":request.audio,"scenario":load_demo().model_dump(),"policy":"meta"})
+                        self.send(202,{"job_id":job_id})
+                    else:
+                        if not busy.acquire(blocking=False):
+                            self.send(409,{"error":"An experiment is already running."})
+                            return
+                        try:
+                            from .provider import ModelClient
+                            self.send(200,ModelClient('meta').transcribe_audio(request.audio))
+                        finally:
+                            busy.release()
+                except (ValueError,RuntimeError) as error:
+                    self.send(422,{"error":str(error).split("\n")[0][:250]})
+                except Exception:
+                    self.send(503,{"error":"Voice transcription unavailable. No update or automatic retry."})
                 return
             if path == "/api/interpret-image":
                 try:
@@ -308,7 +338,7 @@ def run_dashboard(port: int = 8765, *, bind: str = "127.0.0.1", public_host: str
             if cloud and path == "/api/episode":
                 from .cloud import start
                 try:
-                    job_id = start("episode", {"policy":request.policy,"scenario":load_demo().model_dump()})
+                    job_id = start("episode", {"policy":request.policy,"scenario":load_demo().model_dump(),"investigate_repair_risk":request.investigate_repair_risk})
                     self.send(202,{"job_id":job_id,"status":"running"})
                 except ValueError as error:
                     self.send(409,{"error":str(error)})

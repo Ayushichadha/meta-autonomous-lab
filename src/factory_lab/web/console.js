@@ -9,18 +9,19 @@
   let episode = null, frameIndex = 0, preview = null, running = false, metaReady = false, notesReady = true;
   let sourceId = 'recorded', noteResult = null, noteId = null, noteContextKey = null;
   let playTimer=null, imageData=null, visualNeedsReview=false, imageRead=false;
+  let audioData=null, audioRead=false, recorder=null, micStream=null, recordTimer=null, recording=false;
   const status = (text,error=false) => { $('console-status').textContent=text; $('console-status').classList.toggle('error',error); };
   const fmt = value => Number.isFinite(value) ? Number(value.toFixed(2)).toLocaleString() : '—';
   async function request(path, options) { if(publicReplay&&options?.method&&options.method!=='GET')throw Error('Public replay is read-only. Run locally for fresh simulation and inference.'); const target=publicReplay?publicAssets[path]:path; if(!target)throw Error('This action is available in the local application.'); const response=await fetch(target,options);const data=await response.json();if(!response.ok)throw Error(data.error||'Request failed');return data; }
   function busy(value) {if(value)stopPlayback();running=value;document.body.classList.toggle('running',value);$('start-episode').disabled=value||publicReplay;$('episode-policy').disabled=value||publicReplay;$('recorded').disabled=value; $('replay-note').disabled=value; updateNoteButtons();}
-  async function connection() {try {const data=await request('/api/status');metaReady=!publicReplay&&data.providers.meta.configured; notesReady=data.capabilities?.maintenance_notes!==false; updateNoteButtons();$('credit-status').textContent=publicReplay?'PUBLIC REPLAY · recorded real Meta runs. No key, account access, or inference charges. Run locally for new executions.':`Meta key ${metaReady?'configured':'not configured'} · local $1 guard${data.budget?` · $${data.budget.reserved_or_estimated_usd.toFixed(3)} recorded/reserved`:''}. Not the account balance.`;}catch(error){$('credit-status').textContent=error.message;}}
+  async function connection() {try {const data=await request('/api/status');metaReady=!publicReplay&&data.providers.meta.configured; notesReady=data.capabilities?.maintenance_notes!==false; updateNoteButtons();$('credit-status').textContent=publicReplay?'PUBLIC REPLAY · recorded real Meta runs. No key, account access, or inference charges. Run locally for new executions.':`Meta key ${metaReady?'configured':'not configured'} · application $${data.budget?.limit_usd||1} guard${data.budget?` · $${data.budget.reserved_or_estimated_usd.toFixed(3)} recorded/reserved`:''}. Not the account balance.`;}catch(error){$('credit-status').textContent=error.message;}}
   async function recorded() {stopPlayback();try {const data=await request('/api/recorded-episode');episode=data.episode;sourceId='recorded';$('playback-status').textContent='Playback advances recorded observations; no new inference.';setProgress('observe','Recorded run loaded. Use Play shift to inspect observations.');frameIndex=Math.max(0,episode.frames.findIndex(f=>f.time===25));preview=null;render('RECORDED META EXECUTION');status('Loaded a recorded real Meta run. Replaying it spends no API credits.');}catch(error){status(error.message,true);}}
   async function execute() {
     if(running)return;const policy=$('episode-policy').value;
     if(policy==='meta'&&!metaReady){status('Add your Meta key locally before starting a live model episode.',true);return;}
     busy(true);status(policy==='meta'?'Starting real Meta-supervised execution. Local credit guard is active.':'Executing the conventional simulation. No API credits used.');
     try {
-      const job=await request('/api/episode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({policy,provider:'meta'})});
+      const job=await request('/api/episode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({policy,provider:'meta',investigate_repair_risk:$('meta-risk-focus').checked})});
       await followJob(job);
     }catch(error){status(error.message,true);}finally{busy(false);connection();}
   }
@@ -49,6 +50,7 @@
     const decision=f.decision;
     const last=episode.frames.slice(0,frameIndex+1).findLast(frame=>frame.decision);
     const d=decision||last?.decision;
+    $('diagnostic-results').innerHTML=stressEvidence(d);
     $('current-event').textContent=f.events.length?f.events.map(e=>`${e.kind.replaceAll('_',' ')} · ${e.machine}\n${e.source}`).join('\n\n'):'Clock/state observation. No new operational incident at this boundary.';
     $('experiment-budget').textContent=`${decision?.candidates?.length||0} / 3 EXPERIMENTS`;
     $('request-budget').textContent=d?`${d.model_requests} model requests at minute ${d.time}`:'No model request';
@@ -108,7 +110,7 @@
   function currentNoteKey() { return `${sourceId}:${frameIndex}:${$('maintenance-note').value.trim()}`; }
   function updateNoteButtons() {
     const valid=Boolean(noteId&&noteResult?.interpretation.status==='validated'&&noteResult.interpretation.events.length&&noteContextKey===currentNoteKey()&&(!visualNeedsReview||$('visual-reviewed').checked));
-    $('interpret-note').disabled=running||publicReplay||!metaReady||!notesReady||!episode||(visualNeedsReview&&!$('visual-reviewed').checked); $('read-image').disabled=running||publicReplay||!metaReady||!imageData||imageRead; $('visual-reviewed').disabled=running; $('sample-image').disabled=running; $('maintenance-image').disabled=running; $('play-shift').disabled=running||!episode; $('interpret-note').title=notesReady?'':'Live note interpretation is available locally; hosted replay remains available.'; $('start-episode').disabled=running||publicReplay; $('episode-policy').disabled=running||publicReplay;
+    $('interpret-note').disabled=running||publicReplay||!metaReady||!notesReady||!episode||(visualNeedsReview&&!$('visual-reviewed').checked); $('read-image').disabled=running||publicReplay||!metaReady||!imageData||imageRead; $('meta-risk-focus').disabled=running||publicReplay||$('episode-policy').value!=='meta'; $('voice-record').disabled=running&&!recording; $('maintenance-audio').disabled=running; $('transcribe-audio').disabled=running||publicReplay||!metaReady||!audioData||audioRead; $('visual-reviewed').disabled=running; $('sample-image').disabled=running; $('maintenance-image').disabled=running; $('play-shift').disabled=running||!episode; $('interpret-note').title=notesReady?'':'Live note interpretation is available locally; hosted replay remains available.'; $('start-episode').disabled=running||publicReplay; $('episode-policy').disabled=running||publicReplay;
     $('apply-note').disabled=running||publicReplay||!valid;
     $('apply-note-meta').disabled=running||publicReplay||!valid||!metaReady;
   }
@@ -154,7 +156,7 @@
   function reportProgress(item) {
     const stage=item.stage||'';
     const phase=/selected|select_plan/.test(stage+' '+(item.tool||''))?'decide':/experiment|tool_|model_request/.test(stage)?'test':'observe';
-    const labels={reading_image:'Meta is reading visible image evidence. No factory update has been applied.',validating_note:'Meta is extracting claims; independent checks follow.',model_request:'Meta is reasoning from the current observation and tool evidence.',tool_started:'Running a bounded experiment or inspection tool.',tool_completed:'Tool evidence returned to the supervisor.',plan_selected:'A tested plan has been selected for independent validation.'};
+    const labels={transcribing_audio:'Muse Voice Transcribe is reading the submitted recording. No factory update is applied.',reading_image:'Meta is reading visible image evidence. No factory update has been applied.',validating_note:'Meta is extracting claims; independent checks follow.',model_request:'Meta is reasoning from the current observation and tool evidence.',tool_started:'Running a bounded experiment or inspection tool.',tool_completed:'Tool evidence returned to the supervisor.',plan_selected:'A tested plan has been selected for independent validation.'};
     setProgress(phase,`${item.time!==undefined?'Minute '+item.time+' · ':''}${labels[stage]||stage.replaceAll('_',' ')}${item.tool?' · '+item.tool:''}`);
   }
   async function analysisResult(job) {
@@ -191,6 +193,35 @@
   $('maintenance-image').onchange=async()=>{try{await uploadImage($('maintenance-image').files[0]);}catch(error){status(error.message,true);}};
   $('sample-image').onclick=sampleImage;$('read-image').onclick=readImage;$('visual-reviewed').onchange=updateNoteButtons;
   $('play-shift').onclick=playShift;$('restart-shift').onclick=()=>{stopPlayback();if(episode){frameIndex=0;preview=null;render();}};$('playback-speed').onchange=()=>{if(playTimer!==null){stopPlayback();playShift();}};
+
+
+  function stressEvidence(decision){const trials=decision?.diagnostic_trials||[];if(!trials.length)return '';
+    return '<h4>Agent-requested counterfactual tests · '+trials.length+' / 2</h4><p class="stress-caption">Extra repair delays selected by the supervisor. Measured simulation forecasts, not future facts or probability guarantees.</p>'+trials.map(t=>{const actual=t.metrics.weighted_tardiness_minutes,maximum=Math.max(actual,t.nominal_weighted_delay,1);return '<div class="stress-trial"><strong>'+esc(names[t.policy])+' · repair another '+t.extra_delay_minutes+' min later</strong><div>Nominal: '+fmt(t.nominal_weighted_delay)+' weighted-delay minutes</div><div class="stress-track nominal"><i style="width:'+100*t.nominal_weighted_delay/maximum+'%"></i></div><div>Tested delay: '+fmt(actual)+' · change '+fmt(t.additional_weighted_delay)+'</div><div class="stress-track"><i style="width:'+100*actual/maximum+'%"></i></div></div>';}).join('');
+  }
+  async function prepareAudio(blob,label){
+    if(blob.size>5*1024*1024)throw Error('Choose an audio file below 5 MB and 20 seconds.');
+    const context=new AudioContext();let decoded;
+    try{decoded=await context.decodeAudioData(await blob.arrayBuffer());}finally{await context.close();}
+    if(!(decoded.duration>0&&decoded.duration<=20.1))throw Error('Record or choose at most 20 seconds of audio.');
+    const length=Math.min(480000,Math.ceil(decoded.duration*24000));const offline=new OfflineAudioContext(1,length,24000);const source=offline.createBufferSource();source.buffer=decoded;source.connect(offline.destination);source.start();const rendered=await offline.startRendering();const samples=rendered.getChannelData(0);const wav=new ArrayBuffer(44+samples.length*2);const v=new DataView(wav);const ascii=(offset,text)=>{for(let i=0;i<text.length;i++)v.setUint8(offset+i,text.charCodeAt(i));};ascii(0,'RIFF');v.setUint32(4,36+samples.length*2,true);ascii(8,'WAVE');ascii(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,24000,true);v.setUint32(28,48000,true);v.setUint16(32,2,true);v.setUint16(34,16,true);ascii(36,'data');v.setUint32(40,samples.length*2,true);for(let i=0;i<samples.length;i++)v.setInt16(44+i*2,Math.round(Math.max(-1,Math.min(1,samples[i]))*(samples[i]<0?32768:32767)),true);
+    const bytes=new Uint8Array(wav);let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));audioData='data:audio/wav;base64,'+btoa(binary);audioRead=false;$('voice-preview').src=audioData;$('voice-preview').hidden=false;$('voice-status').textContent=label+' · '+decoded.duration.toFixed(1)+' seconds · ready for local playback. Nothing sent yet.';$('voice-result').textContent='';updateNoteButtons();
+  }
+  async function toggleRecording(){
+    if(recording){recorder.stop();return;}
+    if(running)return;
+    try{micStream=await navigator.mediaDevices.getUserMedia({audio:true});const chunks=[];recorder=new MediaRecorder(micStream);recording=true;busy(true);$('voice-record').textContent='■ Stop recording';$('voice-status').textContent='Recording locally · automatically stops after 20 seconds. Nothing sent to Meta.';
+      recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+      recorder.onstop=async()=>{clearTimeout(recordTimer);micStream.getTracks().forEach(t=>t.stop());recording=false;$('voice-record').textContent='● Record update';try{await prepareAudio(new Blob(chunks,{type:recorder.mimeType}),'Recorded update');}catch(error){status(error.message,true);}finally{busy(false);}};
+      recorder.onerror=()=>{clearTimeout(recordTimer);micStream.getTracks().forEach(t=>t.stop());recording=false;$('voice-record').textContent='● Record update';busy(false);status('Recording failed. No audio was sent to Meta.',true);};
+      recorder.start();recordTimer=setTimeout(()=>{if(recording)recorder.stop();},20000);updateNoteButtons();
+    }catch(error){micStream?.getTracks().forEach(t=>t.stop());recording=false;busy(false);status('Microphone unavailable or permission declined. You can upload a short audio file instead.',true);}
+  }
+  async function transcribeAudio(){if(running||!audioData||audioRead||publicReplay)return;busy(true);setProgress('observe','Submitting a short recording for transcription; cached results are reused.');
+    try{let result=await request('/api/transcribe-audio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audio:audioData,provider:'meta'})});if(result.job_id)result=await analysisResult(result);audioRead=true;visualNeedsReview=true;noteId=null;noteResult=null;$('visual-reviewed').checked=false;$('visual-review-label').hidden=false;$('maintenance-note').value=result.transcription;$('voice-result').innerHTML='<strong>Muse Voice Transcribe · review required</strong><p>'+esc(result.transcription)+'</p><p>'+(result.cache_hit?'Cached result · no new inference':Number.isFinite(result.estimated_cost_usd)?'Estimated transcription cost: $'+result.estimated_cost_usd.toFixed(5):'Usage unverified; reservation retained')+'. No factory state changed.</p>';$('voice-status').textContent='Listen and check the editable transcription, then confirm review and validate it.';$('note-result').textContent='Spoken evidence has not yet been validated as an operator update.';setProgress('observe','Review the voice transcription before validating or applying an update.');status('Voice report transcribed. Review required.');
+    }catch(error){status(error.message,true);}finally{busy(false);connection();}
+  }
+  $('voice-record').onclick=toggleRecording;$('transcribe-audio').onclick=transcribeAudio;$('maintenance-audio').onchange=async()=>{busy(true);try{const file=$('maintenance-audio').files[0];if(file)await prepareAudio(file,file.name);}catch(error){status(error.message,true);}finally{busy(false);}};
+  $('episode-policy').onchange=updateNoteButtons;
 
   connection();sampleImage();evaluation();
 })();

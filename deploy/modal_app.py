@@ -24,6 +24,7 @@ def execute(job_id, kind, payload):
     if not Path('/app/runs').exists():
         Path('/app/runs').symlink_to('/state/runs',target_is_directory=True)
     os.environ['FACTORY_MODAL_VOLUME']='factory-recovery-state'
+    os.environ['FACTORY_META_LIMIT_USD']='3'
     from factory_lab.cloud import execute as run
     run(job_id,kind,payload)
 
@@ -37,7 +38,7 @@ def web():
     import subprocess
     from urllib.parse import urlsplit
     host=urlsplit(modal.Function.from_name('factory-recovery-lab','web').get_web_url()).netloc
-    env={**os.environ,'PYTHONPATH':'/app/src','FACTORY_CLOUD_JOBS':'1','FACTORY_PUBLIC_HOST':host}
+    env={**os.environ,'PYTHONPATH':'/app/src','FACTORY_CLOUD_JOBS':'1','FACTORY_PUBLIC_HOST':host,'FACTORY_META_LIMIT_USD':'3'}
     code=('from factory_lab.server import run_dashboard; import os; '
           'run_dashboard(8000,bind="0.0.0.0",public_host=os.environ["FACTORY_PUBLIC_HOST"])')
     subprocess.Popen(['python','-c',code],cwd='/app',env=env)

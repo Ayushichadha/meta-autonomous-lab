@@ -16,6 +16,13 @@ PRICING_SOURCE = "https://dev.meta.ai/docs/pricing-rate-limits"
 PRICING_CHECKED = "2026-11-01"
 
 
+def configured_limit() -> float:
+    value = float(os.getenv("FACTORY_META_LIMIT_USD", "1"))
+    if not math.isfinite(value) or not 0 < value <= 3:
+        raise ValueError("Configured Meta allowance must be positive and at most $3")
+    return value
+
+
 def rates(model: str) -> tuple[float, float, float]:
     if model in {"muse-spark-1.1", "muse-spark-1.2", "muse-spark-1.3"}:
         return 1.25, .15, 4.25
@@ -25,6 +32,11 @@ def rates(model: str) -> tuple[float, float, float]:
 
 
 def usage_cost(model: str, usage: dict) -> float | None:
+    if model == "muse-voice-transcribe-1.0":
+        duration = usage.get("audioDurationMs")
+        if not isinstance(duration, (int, float)) or not math.isfinite(duration) or duration < 0:
+            return None
+        return math.floor(duration / 1000) * .18 / 3600
     prompt = usage.get("prompt_tokens", usage.get("input_tokens"))
     output = usage.get("completion_tokens", usage.get("output_tokens"))
     if not isinstance(prompt, int) or not isinstance(output, int) or min(prompt, output) < 0:

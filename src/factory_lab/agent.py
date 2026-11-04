@@ -16,6 +16,12 @@ class ExperimentRequest(Model):
     hypothesis: str = Field(default="Test this recovery action against current commitments.", max_length=500)
 
 
+class StressRequest(Model):
+    policy: Literal["preserve", "reschedule", "reroute"]
+    extra_delay_minutes: Literal[15, 30, 60]
+    hypothesis: str = Field(min_length=1, max_length=500)
+
+
 class InspectionRequest(Model):
     focus_machine: str | None = None
 
@@ -34,6 +40,8 @@ TOOLS = [
     function("run_experiment", "Solve and simulate a recovery policy under published repair uncertainty. At most three distinct policies. Preserve retains queue/routing; reschedule changes queue order; reroute can also move eligible queued work.", ExperimentRequest.model_json_schema()),
     function("select_plan", "Select an already tested, independently validated candidate. Include a concise evidence summary referencing tool results and trade-offs. No free-form schedule generation.", Selection.model_json_schema()),
 ]
+
+STRESS_TOOL = function("stress_test_plan", "Replay an already tested candidate with a chosen extra repair delay of 15, 30 or 60 minutes. At most two distinct trials. Tests assumptions without changing the plan or physical state.", StressRequest.model_json_schema())
 
 SYSTEM = """You supervise a simulated component factory. Protect delivery commitments while
 avoiding unnecessary schedule changes. All times are integer minutes from shift start.
@@ -69,7 +77,7 @@ def compact_evidence(candidate: dict) -> dict:
 def supervise(client: ModelClient, scenario: Scenario, state: Snapshot, reference: Plan,
               incident: Incident | None, *, time_limit: float = 3.0,
               observed_event: dict | None = None, decision_history: list | None = None,
-              max_requests: int = 6, on_progress=None) -> dict:
+              max_requests: int = 6, on_progress=None, enable_stress_tests: bool = False) -> dict:
     context = {"scenario": scenario.model_dump(), "observation": state.model_dump(),
                "reference_schedule": reference.model_dump(), "incident": incident.model_dump() if incident else None,
                "current_event": observed_event, "previous_decisions": (decision_history or [])[-3:]}
@@ -78,9 +86,11 @@ def supervise(client: ModelClient, scenario: Scenario, state: Snapshot, referenc
     context["decision_request_budget"] = max_requests
     baseline = experiment(scenario, state, reference, incident, "preserve", time_limit)
     context["mandatory_baseline"] = compact_evidence(baseline)
-    messages = [{"role": "system", "content": SYSTEM},
+    system = SYSTEM + (" You may request at most two stress_test_plan trials on already tested candidates. Choose explicit extra repair delays only when robustness evidence could change your decision. These trials count separately from the three candidate solves; disclose their assumptions." if enable_stress_tests else "")
+    messages = [{"role": "system", "content": system},
                 {"role": "user", "content": json.dumps(context)}]
     candidates, usage = {"preserve": baseline}, []
+    diagnostics = {}
     trace = [{"round": 0, "tool": "run_experiment", "origin": "mandatory_baseline",
               "request": {"policy": "preserve", "hypothesis": "Establish the cost of retaining commitments."},
               "result": compact_evidence(baseline)}]
@@ -89,7 +99,7 @@ def supervise(client: ModelClient, scenario: Scenario, state: Snapshot, referenc
         try:
             if on_progress:
                 on_progress({"stage": "model_request", "request": round_number + 1, "time": state.now})
-            tools = TOOLS
+            tools = TOOLS + ([STRESS_TOOL] if enable_stress_tests else [])
             if round_number == max_requests - 1:
                 messages.append({"role": "user", "content": "Final request in the decision budget. Select a tested plan now using select_plan; do not request more experiments."})
                 tools = [t for t in TOOLS if t["function"]["name"] == "select_plan"]
@@ -141,6 +151,18 @@ def supervise(client: ModelClient, scenario: Scenario, state: Snapshot, referenc
                     # Send metrics, not redundant schedule details, back to the model.
                     observation = compact_evidence(result)
                     observation["cache_hit"] = cache_hit
+                elif name == "stress_test_plan" and enable_stress_tests:
+                    from .experiments import stress_test_plan
+                    request = StressRequest.model_validate(arguments)
+                    if request.policy not in candidates:
+                        raise ValueError("Stress test needs an already tested candidate")
+                    key = (request.policy,request.extra_delay_minutes)
+                    cache_hit = key in diagnostics
+                    if not cache_hit:
+                        if len(diagnostics) >= 2:
+                            raise ValueError("Two-trial stress budget exhausted")
+                        diagnostics[key] = stress_test_plan(scenario,state,reference,incident,candidates[request.policy],request.extra_delay_minutes)
+                    observation = {**diagnostics[key],"cache_hit":cache_hit}
                 elif name == "select_plan":
                     selected = Selection.model_validate(arguments)
                     if selected.policy not in candidates:
@@ -156,6 +178,8 @@ def supervise(client: ModelClient, scenario: Scenario, state: Snapshot, referenc
                             "selected_policy": selected.policy, "evidence_summary": selected.evidence_summary,
                             "selected_candidate": candidates[selected.policy],
                             "experiments": list(candidates.values()), "trace": trace,
+                            "diagnostic_trials":list(diagnostics.values()),
+                            "tool_profile":"bounded_stress_v3" if enable_stress_tests else "baseline_v2",
                             "model_requests": round_number + 1, "usage_by_request": usage,
                             "model_seconds": total_seconds,
                             "cost_usd": getattr(client, "cost_usd", None),

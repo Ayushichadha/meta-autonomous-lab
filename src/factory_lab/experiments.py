@@ -59,3 +59,24 @@ def run_comparison(scenario: Scenario, *, time_limit: float = 3.0,
         "objective_weights": {"priority_weighted_tardiness": 100, "queued_start_shift": 1,
                               "rerouted_operation": 30, "makespan": 1},
     }
+
+
+def stress_test_plan(scenario: Scenario, state: Snapshot, reference: Plan, incident: Incident | None,
+                     candidate: dict, extra_delay_minutes: int) -> dict:
+    """Replay an already tested plan under one explicit later-repair assumption."""
+    if extra_delay_minutes not in {15,30,60} or isinstance(extra_delay_minutes,bool):
+        raise ValueError('Stress delay must be 15, 30 or 60 minutes')
+    if incident is None or state.available_at.get(incident.machine) != incident.estimated_repair_at:
+        raise ValueError('Stress testing requires a currently observed outage and repair estimate')
+    from .validation import require_valid
+    plan=Plan.model_validate(candidate['plan'])
+    require_valid(scenario,state,plan)
+    assumed=incident.estimated_repair_at+extra_delay_minutes
+    run=simulate(scenario,state,plan,repair_overrides={incident.machine:assumed})
+    metrics=measure(scenario,run.snapshot,plan=plan,reference=reference,decision_state=state)
+    return {'policy':candidate['policy'],'extra_delay_minutes':extra_delay_minutes,
+            'repair_assumptions':{**state.available_at,incident.machine:assumed},
+            'metrics':{k:v for k,v in metrics.items() if k!='orders'},
+            'nominal_weighted_delay':candidate['nominal_metrics']['weighted_tardiness_minutes'],
+            'additional_weighted_delay':metrics['weighted_tardiness_minutes']-candidate['nominal_metrics']['weighted_tardiness_minutes'],
+            'note':'One explicitly chosen counterfactual forecast. No future trace, probability or guaranteed robustness.'}

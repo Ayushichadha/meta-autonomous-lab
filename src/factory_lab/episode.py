@@ -99,6 +99,7 @@ def _decision(scenario, state, reference, incident, policy, config, callback, hi
         "candidates": candidates, "predicted_metrics": chosen["nominal_metrics"],
         "model_requests": result["model_requests"], "usage_by_request": result["usage_by_request"],
         "estimated_cost_usd": result.get("cost_usd"), "tool_trace": result.get("trace", []),
+        "diagnostic_trials":result.get("diagnostic_trials",[]), "tool_profile":result.get("tool_profile","conventional"),
         "wall_seconds": perf_counter() - start}
 
 
@@ -258,6 +259,7 @@ def run_episode(scenario: Scenario, events: list[WorldEvent], *, policy: str = "
                         guard_solver_calls=len(frames) - 1,
                         experiment_solver_calls=sum(len(d.get("candidates", [])) for d in decisions),
                         experiment_solver_seconds=experiment_seconds,
+                        diagnostic_simulation_calls=sum(len(d.get("diagnostic_trials",[])) for d in decisions),
                         model_input_tokens=sum(u.get("prompt_tokens", u.get("input_tokens", 0)) for u in usages),
                         model_output_tokens=sum(u.get("completion_tokens", u.get("output_tokens", 0)) for u in usages),
                         estimated_model_cost_usd=sum(d.get("estimated_cost_usd") or 0 for d in decisions) if costs_known else None,
@@ -281,12 +283,17 @@ def demo_events() -> list[WorldEvent]:
             WorldEvent(time=118, kind="repaired", machine="CNC-A", source="Maintenance confirms CNC-A returned to service.")]
 
 
-def live_supervisor(provider: str = "meta", *, solve_seconds: float = .5, on_progress=None):
+def live_supervisor(provider: str = "meta", *, solve_seconds: float = .5, on_progress=None, enable_stress_tests: bool = False, investigate_repair_risk: bool = False):
     """New bounded client per decision; all share the persistent dollar ledger."""
+    investigation_requested = False
     def decide(scenario, state, reference, incident, history, event):
+        nonlocal investigation_requested
+        if investigate_repair_risk and enable_stress_tests and incident is not None and not investigation_requested:
+            event = {**event, "operator_investigation_request":"Investigate late-repair risk before selecting a plan. Choose and execute a bounded stress_test_plan on a tested candidate; explain the forecast trade-off."}
+            investigation_requested = True
         from .agent import supervise
         from .provider import ModelClient
         return supervise(ModelClient(provider), scenario, state, reference, incident,
                          time_limit=solve_seconds, observed_event=event, decision_history=history,
-                         max_requests=min(6, event["remaining_episode_model_requests"]), on_progress=on_progress)
+                         max_requests=min(6, event["remaining_episode_model_requests"]), on_progress=on_progress, enable_stress_tests=enable_stress_tests)
     return decide

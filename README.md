@@ -18,6 +18,8 @@ Built by Ayushi Chadha for the Meta Global AI Developer Hackathon 2026, **Indie 
 - A real Muse Spark 1.3 tool-using supervisor, with experiment/request budgets and explicit failure fallback.
 - Independent validation of schedules, including downtime, overlap, progress, and immutable completed work.
 - An operations console with observation replay, actual/forecast Gantt segments, queues, hypotheses, tool traces, decisions, and evaluation results.
+- Muse Voice Transcribe turns short recorded or uploaded operator audio into review-required text, feeding the same checked recovery workflow.
+- The live Meta supervisor can request up to two additional bounded repair-delay stress tests; frozen evaluations retain their original protocol.
 - Muse Spark vision reads bounded maintenance images into editable, review-required transcriptions; validated reports feed recovery branches.
 - A visible synthetic maintenance board on first load and a factory process diagram reflecting observed machine states.
 - Play/pause/restart shift replay, adjustable speed, event highlights and actual worker-progress feedback.
@@ -143,9 +145,9 @@ Historical outputs are reproduced most closely by checking out their recorded so
 
 ## Credit controls
 
-The local `runs/meta-usage.jsonl` ledger enforces a conservative **$1 development allowance**, shared across clients/processes. This is an application guard, **not an account-wide billing limit**. Unknown usage retains a reservation. There are no automatic network retries.
+The `runs/meta-usage.jsonl` ledger enforces a **$1 local default allowance** and a **$3 hosted total allowance**, shared across model calls on that deployment, including voice transcription. The hosted ledger retains earlier development usage; it was not reset. This is an application guard, **not an account-wide billing limit**. Unknown usage retains a reservation. There are no automatic network retries.
 
-Defaults: 60,000 serialized prompt bytes, 1,024 generated tokens per request, six model requests per decision, twelve per episode, and three candidate experiments per decision. Meta cost estimates use reported token counts and [standard rates](https://dev.meta.ai/docs/pricing-rate-limits) checked November 1, 2026; provider billing is authoritative. The preserved small allowance intentionally prevents a large evaluation from consuming the participant's full credit grant.
+Defaults: 60,000 serialized prompt bytes, 1,024 generated tokens per request, six model requests per decision, twelve per episode, and three candidate experiments per decision. Meta cost estimates use reported token counts and [standard rates](https://dev.meta.ai/docs/pricing-rate-limits) checked November 1, 2026; provider billing is authoritative. The small allowance prevents a large evaluation from consuming the participant's full credit grant.
 
 ## Research foundations and new work
 

@@ -50,13 +50,17 @@ def execute(job_id, kind, payload):
         record['frames'].append(item)
         jobs[job_id]=record
     try:
-        if kind in {'image','note'}:
+        if kind in {'image','note','voice'}:
             from .provider import ModelClient
             progress({'stage':'checking_cached_evidence'})
             import hashlib
             import os
             model=os.getenv('META_MODEL','muse-spark-1.3')
-            if kind=='image':
+            if kind=='voice':
+                from .voice import validate_audio
+                _,_,digest=validate_audio(payload['audio'])
+                cache_key={'schema':1,'kind':kind,'digest':digest,'model':'muse-voice-transcribe-1.0'}
+            elif kind=='image':
                 from .vision import interpret_image, validate_image
                 _,digest=validate_image(payload['image'])
                 cache_key={'schema':1,'kind':kind,'digest':digest,'model':model}
@@ -71,10 +75,13 @@ def execute(job_id, kind, payload):
             if cached:
                 analysis=json.loads(cache.read_text())
             else:
-                progress({'stage':'reading_image' if kind=='image' else 'validating_note'})
-                analysis=interpret_image(ModelClient('meta'),payload['image']) if kind=='image' else interpret_note(ModelClient('meta'),payload['note'],scenario,state)
+                progress({'stage':{'image':'reading_image','voice':'transcribing_audio','note':'validating_note'}[kind]})
+                if kind=='voice':
+                    analysis=ModelClient('meta').transcribe_audio(payload['audio'])
+                else:
+                    analysis=interpret_image(ModelClient('meta'),payload['image']) if kind=='image' else interpret_note(ModelClient('meta'),payload['note'],scenario,state)
                 cache.write_text(json.dumps(analysis));cache.chmod(0o600)
-            if kind=='image':
+            if kind in {'image','voice'}:
                 result={**analysis,'cache_hit':cached}
             else:
                 result={'interpretation_id':job_id,'interpretation':analysis,'cache_hit':cached}
@@ -88,10 +95,14 @@ def execute(job_id, kind, payload):
             cfg=EpisodeConfig()
             result=run_episode(Scenario.model_validate(payload['scenario']),demo_events(),
                 policy=payload['policy'], config=cfg, on_frame=frame,
-                supervisor=live_supervisor('meta',solve_seconds=cfg.solve_seconds,on_progress=progress)
+                supervisor=live_supervisor('meta',solve_seconds=cfg.solve_seconds,on_progress=progress,enable_stress_tests=True,investigate_repair_risk=payload.get("investigate_repair_risk",False))
                 if payload['policy']=='meta' else None)
-        if kind not in {'image','note'}:
+        if kind not in {'image','note','voice'}:
             result['run_id']=job_id
+        if kind=='episode':
+            result['supervisor_configuration']={'stress_tools_enabled':payload['policy']=='meta',
+                'investigate_repair_risk':payload.get('investigate_repair_risk',False),
+                'max_diagnostic_trials_per_decision':2}
         Path('runs').mkdir(exist_ok=True)
         Path('runs',job_id+'-episode.json').write_text(json.dumps(result))
         import modal
