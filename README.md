@@ -19,6 +19,7 @@ Built by Ayushi Chadha for the Meta Global AI Developer Hackathon 2026, **Indie 
 - Independent validation of schedules, including downtime, overlap, progress, and immutable completed work.
 - An operations console with observation replay, actual/forecast Gantt segments, queues, hypotheses, tool traces, decisions, and evaluation results.
 - Muse Spark vision reads bounded maintenance images into editable, review-required transcriptions; validated reports feed recovery branches.
+- A visible synthetic maintenance board on first load and a factory process diagram reflecting observed machine states.
 - Play/pause/restart shift replay, adjustable speed, event highlights and actual worker-progress feedback.
 - Maintenance notes interpreted by Meta into quoted claims, independently checked and applied in a separate simulation branch. Missing or ambiguous estimates require clarification.
 - Frozen synthetic evaluation: 20 cases per version, four conventional policies, and three predeclared real-Meta cases per version. All outcomes and original failures are published.

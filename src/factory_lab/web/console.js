@@ -45,6 +45,7 @@
     for(const button of document.querySelectorAll('[data-frame]'))button.onclick=()=>{stopPlayback();frameIndex=Number(button.dataset.frame);preview=null;render();};
     $('factory-machines').innerHTML=f.factory.machines.map(m=>`<div class="machine ${m.status==='running'?'running':''} ${m.status==='down'?'down':''}"><div class="machine-name">${esc(m.machine)}<i></i></div><div class="machine-status">${esc(m.status)}</div><p>${m.current_operation?esc(m.current_operation):'No active operation'}</p><p>${m.status==='down'?`Forecast available: minute ${m.forecast_available_at}`:'Available to the dispatcher'}</p><p class="queue">QUEUE · ${m.queue.length?esc(m.queue.join(' → ')):'empty'}</p></div>`).join('');
     $('operation-register').innerHTML=f.factory.operations.map(o=>`<tr><td>${esc(o.operation)}</td><td>${esc(o.machine)}</td><td><span class="state-tag ${o.status}">${esc(o.status)}</span></td><td>${o.worked_minutes} min</td><td>${o.remaining_minutes} min</td></tr>`).join('');
+    $('factory-flow').innerHTML=factoryFlow(f);
     const decision=f.decision;
     const last=episode.frames.slice(0,frameIndex+1).findLast(frame=>frame.decision);
     const d=decision||last?.decision;
@@ -61,6 +62,16 @@
     $('realized-metrics').innerHTML=m?[[m.weighted_tardiness_minutes,'priority-weighted delay / min'],[`${m.on_time_orders}/${m.total_orders}`,'orders on time'],[m.revision_count,'optional plan revisions'],[m.rerouted_operations,'reroute transitions'],[m.model_calls,'model requests'],[Number.isFinite(m.estimated_model_cost_usd)?'$'+m.estimated_model_cost_usd.toFixed(3):'unknown','estimated model cost']].map(([v,label])=>`<div class="metric"><strong>${esc(v)}</strong><span>${esc(label)}</span></div>`).join(''):'<p class="muted">Episode did not finish; outcomes are unavailable.</p>';
     $('episode-limitations').textContent=`Final metrics are from the complete recorded/executed shift, even when inspecting an earlier observation. Policy: ${names[episode.policy]}. ${episode.limitations.join(' ')}${episode.branch?' This is a new maintenance-note branch. Past observations are preserved; revision and model-use counters cover the branch only.':''}`;$('episode-failures').innerHTML=episode.failures.map(failure=>`<div class="failure">Minute ${failure.time??'—'} · ${esc(failure.error)} · ${esc(failure.fallback||'no fallback')}</div>`).join('');
   }
+
+  function factoryFlow(frame){
+    const positions={'CNC-A':[30,30],'CNC-B':[30,155],'INSPECT':[350,92],'ASSEMBLY':[660,92]};
+    let svg='<svg viewBox="0 0 940 280" role="img" aria-label="Machining, inspection and assembly with current simulated status"><defs><marker id="flow-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7" fill="#96ad9c"/></marker></defs><path class="process-route" d="M260 80H300V142H350M260 205H300V142M580 142H660" fill="none" stroke="#96ad9c" stroke-width="3" marker-end="url(#flow-arrow)"/>';
+    for(const m of frame.factory.machines){const pos=positions[m.machine];if(!pos)continue;const [x,y]=pos;const down=m.status==='down',run=m.status==='running',color=down?'#ad6032':run?'#28664f':'#7d9083';
+      svg+=`<g transform="translate(${x},${y})"><rect width="230" height="102" rx="13" fill="${down?'#fff1dd':run?'#e5f1e6':'#f1f5ef'}" stroke="${color}" stroke-width="2"/><rect x="14" y="17" width="44" height="49" rx="5" fill="${color}"/><rect x="21" y="24" width="30" height="20" rx="2" fill="#f4faf1"/><circle cx="26" cy="54" r="3" fill="white"/><circle cx="44" cy="54" r="3" fill="white"/><circle class="${run?'running-indicator':''}" cx="204" cy="22" r="5" fill="${color}"/><text x="72" y="30" font-size="16" font-weight="650" fill="#203d30">${esc(m.machine)}</text><text x="72" y="51" font-size="13" fill="${color}">${esc(m.status.toUpperCase())}</text><text x="15" y="86" font-size="11" fill="#52675a">${esc(m.current_operation||'No active operation')}</text></g>`;
+    }
+    return svg+`<text x="30" y="276" fill="#64766a" font-size="11">OBSERVED ${frame.time} min · ${frame.factory.operations.filter(o=>o.status==='completed').length} / ${frame.factory.operations.length} operations completed</text></svg>`;
+  }
+
   function gantt(plan, frame) {
     const maximum=Math.ceil(Math.max(...plan.assignments.map(a=>a.end),frame.time)/50)*50||50,x=t=>110+t/maximum*840;
     const segments={};
@@ -167,7 +178,7 @@
     const bitmap=await createImageBitmap(file);const scale=Math.min(1,1400/Math.max(bitmap.width,bitmap.height));const canvas=document.createElement('canvas');canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();
     const data=canvas.toDataURL('image/jpeg',.82);if(data.length>690000)throw Error('Image remains too large. Crop to the maintenance text and upload again.');chooseImage(data,file.name+' · resized, metadata removed');
   }
-  async function sampleImage(){if(running)return;await recorded();frameIndex=episode.frames.findIndex(f=>f.time===55);preview=null;render();
+  async function sampleImage(){if(running)return;await recorded();if(!episode)return;frameIndex=episode.frames.findIndex(f=>f.time===55);preview=null;render();
     const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=650;const c=canvas.getContext('2d');c.fillStyle='#e5ece4';c.fillRect(0,0,1200,650);c.fillStyle='#fcfcf6';c.fillRect(35,35,1130,580);c.fillStyle='#1e4033';c.font='bold 26px sans-serif';c.fillText('SYNTHETIC DEMO · NOT REAL FACTORY DATA',75,95);c.font='bold 42px sans-serif';c.fillText('MAINTENANCE UPDATE',75,180);c.font='29px sans-serif';c.fillText('CNC-A repair delayed by another 40 minutes.',75,290);c.fillText('INSPECT remains available.',75,365);c.font='24px sans-serif';c.fillText('Observed at shift minute 55',75,510);chooseImage(canvas.toDataURL('image/png'),'Synthetic maintenance board · observation set to minute 55');
   }
   async function readImage(){if(running||!imageData||imageRead||publicReplay)return;const data=imageData;busy(true);setProgress('observe','Submitting one bounded image; identical cached evidence will be reused.');status('Reading visual evidence. No update will be applied.');
@@ -181,5 +192,5 @@
   $('sample-image').onclick=sampleImage;$('read-image').onclick=readImage;$('visual-reviewed').onchange=updateNoteButtons;
   $('play-shift').onclick=playShift;$('restart-shift').onclick=()=>{stopPlayback();if(episode){frameIndex=0;preview=null;render();}};$('playback-speed').onchange=()=>{if(playTimer!==null){stopPlayback();playShift();}};
 
-  connection();recorded();evaluation();
+  connection();sampleImage();evaluation();
 })();
